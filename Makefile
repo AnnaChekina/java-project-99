@@ -8,10 +8,10 @@ build:
 	./gradlew clean build
 
 run:
-	./gradlew run
+	./gradlew bootRun
 
 install:
-	./gradlew install
+	./gradlew instinstallDist
 
 run-dist:
 	./build/install/java-project-99/bin/java-project-99

@@ -1,23 +1,9 @@
 ---
-logging:
-  level:
-    root: WARN
-    org:
-      springframework:
-        # web: DEBUG
-        security: DEBUG
-
 spring:
-  # mvc:
-  #   log-request-details: true
-  #   log-resolved-exception: true
-  # codec:
-  #   log-request-details: true
-  datasource:
-    url: jdbc:h2:mem:testdb
-    driver-class-name: org.h2.Driver
-    username: sa
-    password:
+  application:
+    name: app
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
   jpa:
     generate-ddl: true
     show-sql: true
@@ -26,6 +12,14 @@ spring:
   output:
     ansi:
       enabled: always
+
+logging:
+  level:
+    root: WARN
+    org:
+      springframework:
+        # web: DEBUG
+        security: DEBUG
 
 sentry:
   dsn: https://examplePublicKey@o0.ingest.sentry.io/0
