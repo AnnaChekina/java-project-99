@@ -27,12 +27,22 @@ repositories {
 dependencies {
 	implementation("org.springframework.boot:spring-boot-starter-data-jpa")
 	implementation("org.springframework.boot:spring-boot-starter-web")
+	implementation("org.springframework.boot:spring-boot-starter-validation")
+	implementation("org.springframework.boot:spring-boot-starter-security")
+	implementation("org.openapitools:jackson-databind-nullable:0.2.6")
+	implementation("org.mapstruct:mapstruct:1.5.5.Final")
+	implementation("net.datafaker:datafaker:2.0.2")
 	runtimeOnly("org.postgresql:postgresql")
 	runtimeOnly ("com.h2database:h2")
 	compileOnly("org.projectlombok:lombok")
 	annotationProcessor("org.projectlombok:lombok")
+	annotationProcessor("org.projectlombok:lombok-mapstruct-binding:0.2.0")
+	annotationProcessor("org.mapstruct:mapstruct-processor:1.5.5.Final")
 	testImplementation ("com.h2database:h2")
 	testImplementation("org.springframework.boot:spring-boot-starter-test")
+	testImplementation("org.springframework.security:spring-security-test")
+	testImplementation("net.javacrumbs.json-unit:json-unit-assertj:2.38.0")
+	testImplementation("net.datafaker:datafaker:2.0.2")
 	testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 

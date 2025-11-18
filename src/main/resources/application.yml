@@ -6,9 +6,12 @@ spring:
     active: ${SPRING_PROFILES_ACTIVE:dev}
   jpa:
     generate-ddl: true
-    show-sql: true
+    show-sql: false
     hibernate:
       ddl-auto: update
+    properties:
+      hibernate:
+        format_sql: true
   output:
     ansi:
       enabled: always
@@ -20,6 +23,8 @@ logging:
       springframework:
         # web: DEBUG
         security: DEBUG
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
 
 sentry:
   dsn: https://examplePublicKey@o0.ingest.sentry.io/0
