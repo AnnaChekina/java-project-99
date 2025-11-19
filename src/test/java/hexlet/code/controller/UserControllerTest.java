@@ -1,6 +1,7 @@
 package hexlet.code.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import hexlet.code.dto.AuthRequest;
 import hexlet.code.dto.UserCreateDTO;
 import hexlet.code.dto.UserUpdateDTO;
 import hexlet.code.model.User;
@@ -15,6 +16,7 @@ import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.security.test.context.support.WithMockUser;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasSize;
@@ -28,7 +30,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
-public class UserControllerTest {
+class UserControllerTest {
 
     @Autowired
     private MockMvc mockMvc;
@@ -43,12 +45,13 @@ public class UserControllerTest {
     private PasswordEncoder passwordEncoder;
 
     @BeforeEach
-    public void setUp() {
+    void setUp() {
         userRepository.deleteAll();
     }
 
     @Test
-    public void testGetAllUsers() throws Exception {
+    @WithMockUser
+    void testGetAllUsers() throws Exception {
         User user = new User();
         user.setEmail("test@example.com");
         user.setPasswordDigest(passwordEncoder.encode("password"));
@@ -65,7 +68,8 @@ public class UserControllerTest {
     }
 
     @Test
-    public void testGetUserById() throws Exception {
+    @WithMockUser
+    void testGetUserById() throws Exception {
         User user = new User();
         user.setEmail("test@example.com");
         user.setPasswordDigest(passwordEncoder.encode("password"));
@@ -81,10 +85,11 @@ public class UserControllerTest {
     }
 
     @Test
-    public void testCreateUser() throws Exception {
+    @WithMockUser
+    void testCreateUser() throws Exception {
         UserCreateDTO userCreateDTO = new UserCreateDTO();
         userCreateDTO.setEmail("newuser@example.com");
-        userCreateDTO.setPassword("password123"); // Используем password вместо passwordDigest
+        userCreateDTO.setPassword("password123");
         userCreateDTO.setFirstName("Jane");
         userCreateDTO.setLastName("Smith");
 
@@ -100,13 +105,12 @@ public class UserControllerTest {
         assertThat(createdUser).isPresent();
         assertThat(createdUser.get().getFirstName()).isEqualTo("Jane");
         assertThat(createdUser.get().getLastName()).isEqualTo("Smith");
-        // Проверяем, что пароль захеширован
         assertThat(passwordEncoder.matches("password123", createdUser.get().getPasswordDigest())).isTrue();
     }
 
     @Test
-    public void testUpdateUser() throws Exception {
-        // Создаем пользователя для обновления
+    @WithMockUser(username = "test@example.com")
+    void testUpdateUser() throws Exception {
         User user = new User();
         user.setEmail("test@example.com");
         user.setPasswordDigest(passwordEncoder.encode("password"));
@@ -124,7 +128,7 @@ public class UserControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.firstName").value("UpdatedName"))
                 .andExpect(jsonPath("$.email").value("updated@example.com"))
-                .andExpect(jsonPath("$.lastName").value("Doe")); // Не изменилось
+                .andExpect(jsonPath("$.lastName").value("Doe"));
 
         var updatedUser = userRepository.findById(savedUser.getId()).orElseThrow();
         assertThat(updatedUser.getFirstName()).isEqualTo("UpdatedName");
@@ -132,7 +136,8 @@ public class UserControllerTest {
     }
 
     @Test
-    public void testUpdateUserPassword() throws Exception {
+    @WithMockUser(username = "test@example.com")
+    void testUpdateUserPassword() throws Exception {
         User user = new User();
         user.setEmail("test@example.com");
         user.setPasswordDigest(passwordEncoder.encode("oldpassword"));
@@ -141,7 +146,7 @@ public class UserControllerTest {
         User savedUser = userRepository.save(user);
 
         UserUpdateDTO userUpdateDTO = new UserUpdateDTO();
-        userUpdateDTO.setPassword(JsonNullable.of("newpassword123")); // Используем password вместо passwordDigest
+        userUpdateDTO.setPassword(JsonNullable.of("newpassword123"));
 
         mockMvc.perform(put("/api/users/" + savedUser.getId())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -153,7 +158,8 @@ public class UserControllerTest {
     }
 
     @Test
-    public void testDeleteUser() throws Exception {
+    @WithMockUser(username = "test@example.com")
+    void testDeleteUser() throws Exception {
         User user = new User();
         user.setEmail("test@example.com");
         user.setPasswordDigest(passwordEncoder.encode("password"));
@@ -168,10 +174,11 @@ public class UserControllerTest {
     }
 
     @Test
-    public void testCreateUserWithInvalidData() throws Exception {
+    @WithMockUser
+    void testCreateUserWithInvalidData() throws Exception {
         UserCreateDTO userCreateDTO = new UserCreateDTO();
-        userCreateDTO.setEmail("invalid-email"); // Невалидный email
-        userCreateDTO.setPassword("12"); // Пароль слишком короткий
+        userCreateDTO.setEmail("invalid-email");
+        userCreateDTO.setPassword("12");
 
         mockMvc.perform(post("/api/users")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -180,7 +187,8 @@ public class UserControllerTest {
     }
 
     @Test
-    public void testCreateUserWithDuplicateEmail() throws Exception {
+    @WithMockUser
+    void testCreateUserWithDuplicateEmail() throws Exception {
         User existingUser = new User();
         existingUser.setEmail("duplicate@example.com");
         existingUser.setPasswordDigest(passwordEncoder.encode("password"));
@@ -190,38 +198,41 @@ public class UserControllerTest {
 
         UserCreateDTO userCreateDTO = new UserCreateDTO();
         userCreateDTO.setEmail("duplicate@example.com");
-        userCreateDTO.setPassword("password123"); // Используем password вместо passwordDigest
+        userCreateDTO.setPassword("password123");
         userCreateDTO.setFirstName("Jane");
         userCreateDTO.setLastName("Smith");
 
         mockMvc.perform(post("/api/users")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(userCreateDTO)))
-                .andExpect(status().isConflict()); // 409 Conflict
+                .andExpect(status().isConflict());
     }
 
     @Test
-    public void testCreateUserWithNullPassword() throws Exception {
+    @WithMockUser
+    void testCreateUserWithNullPassword() throws Exception {
         UserCreateDTO userCreateDTO = new UserCreateDTO();
         userCreateDTO.setEmail("test@example.com");
-        userCreateDTO.setPassword(null); // Null пароль (используем password)
+        userCreateDTO.setPassword(null);
         userCreateDTO.setFirstName("John");
         userCreateDTO.setLastName("Doe");
 
         mockMvc.perform(post("/api/users")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(userCreateDTO)))
-                .andExpect(status().isBadRequest()); // 400 Bad Request
+                .andExpect(status().isBadRequest());
     }
 
     @Test
-    public void testGetNonExistentUser() throws Exception {
+    @WithMockUser
+    void testGetNonExistentUser() throws Exception {
         mockMvc.perform(get("/api/users/999"))
                 .andExpect(status().isNotFound());
     }
 
     @Test
-    public void testUpdateNonExistentUser() throws Exception {
+    @WithMockUser(username = "nonexistent@example.com")
+    void testUpdateNonExistentUser() throws Exception {
         UserUpdateDTO userUpdateDTO = new UserUpdateDTO();
         userUpdateDTO.setFirstName(JsonNullable.of("UpdatedName"));
 
@@ -232,13 +243,15 @@ public class UserControllerTest {
     }
 
     @Test
-    public void testDeleteNonExistentUser() throws Exception {
+    @WithMockUser(username = "nonexistent@example.com")
+    void testDeleteNonExistentUser() throws Exception {
         mockMvc.perform(delete("/api/users/999"))
-                .andExpect(status().isNoContent());
+                .andExpect(status().isNotFound());
     }
 
     @Test
-    public void testPartialUpdateUser() throws Exception {
+    @WithMockUser(username = "test@example.com")
+    void testPartialUpdateUser() throws Exception {
         User user = new User();
         user.setEmail("test@example.com");
         user.setPasswordDigest(passwordEncoder.encode("password"));
@@ -246,7 +259,6 @@ public class UserControllerTest {
         user.setLastName("Doe");
         User savedUser = userRepository.save(user);
 
-        // Обновляем только firstName
         UserUpdateDTO userUpdateDTO = new UserUpdateDTO();
         userUpdateDTO.setFirstName(JsonNullable.of("UpdatedFirstName"));
 
@@ -255,8 +267,8 @@ public class UserControllerTest {
                         .content(objectMapper.writeValueAsString(userUpdateDTO)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.firstName").value("UpdatedFirstName"))
-                .andExpect(jsonPath("$.lastName").value("Doe")) // Не изменилось
-                .andExpect(jsonPath("$.email").value("test@example.com")); // Не изменилось
+                .andExpect(jsonPath("$.lastName").value("Doe"))
+                .andExpect(jsonPath("$.email").value("test@example.com"));
 
         var updatedUser = userRepository.findById(savedUser.getId()).orElseThrow();
         assertThat(updatedUser.getFirstName()).isEqualTo("UpdatedFirstName");
@@ -264,10 +276,9 @@ public class UserControllerTest {
         assertThat(updatedUser.getEmail()).isEqualTo("test@example.com");
     }
 
-
     @Test
-    public void testUserDTOContainsUpdatedAt() throws Exception {
-        // Создаем отдельного пользователя для этого теста
+    @WithMockUser
+    void testUserDTOContainsUpdatedAt() throws Exception {
         User testUser = new User();
         testUser.setEmail("test-timestamp@example.com");
         testUser.setPasswordDigest(passwordEncoder.encode("password"));
@@ -275,11 +286,9 @@ public class UserControllerTest {
         testUser.setLastName("Test");
         User savedUser = userRepository.save(testUser);
 
-        // Проверяем, что JPA заполнил даты
         assertThat(savedUser.getCreatedAt()).isNotNull();
         assertThat(savedUser.getUpdatedAt()).isNotNull();
 
-        // Тестируем API
         mockMvc.perform(get("/api/users/" + savedUser.getId()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").exists())
@@ -288,5 +297,17 @@ public class UserControllerTest {
                 .andExpect(jsonPath("$.lastName").value("Test"))
                 .andExpect(jsonPath("$.createdAt").exists())
                 .andExpect(jsonPath("$.updatedAt").exists());
+    }
+
+    @Test
+    void testLoginWithInvalidCredentials() throws Exception {
+        AuthRequest authRequest = new AuthRequest();
+        authRequest.setUsername("wrong@example.com");
+        authRequest.setPassword("wrong");
+
+        mockMvc.perform(post("/api/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(authRequest)))
+                .andExpect(status().isUnauthorized());
     }
 }

@@ -8,7 +8,6 @@ import hexlet.code.mapper.UserMapper;
 import hexlet.code.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -23,7 +22,7 @@ public class UserService {
     private UserMapper userMapper;
 
     @Autowired
-    private PasswordEncoder passwordEncoder;
+    private CustomUserDetailsService userDetailsService;
 
     public List<UserDTO> getAll() {
         var users = userRepository.findAll();
@@ -39,18 +38,15 @@ public class UserService {
     }
 
     public UserDTO create(UserCreateDTO userData) {
-        if (userData.getPassword() == null || userData.getPassword().trim().isEmpty()) {
-            throw new IllegalArgumentException("Password cannot be null or empty");
-        }
-
         var user = userMapper.map(userData);
-        user.setPasswordDigest(passwordEncoder.encode(userData.getPassword()));
+
+        user.setPasswordDigest(userData.getPassword());
 
         try {
-            userRepository.save(user);
+            userDetailsService.createUser(user);
             return userMapper.map(user);
         } catch (DataIntegrityViolationException e) {
-            throw new DataIntegrityViolationException("Email already exists: " + userData.getEmail());
+            throw new DataIntegrityViolationException("Email already exists");
         }
     }
 
@@ -61,21 +57,17 @@ public class UserService {
         userMapper.update(userData, user);
 
         if (userData.getPassword() != null && userData.getPassword().isPresent()) {
-            String newPassword = userData.getPassword().get();
-            if (newPassword != null && !newPassword.trim().isEmpty()) {
-                user.setPasswordDigest(passwordEncoder.encode(newPassword));
-            }
+            String rawPassword = userData.getPassword().get();
+            user.setPasswordDigest(rawPassword); // Устанавливаем raw password
         }
 
-        try {
-            userRepository.save(user);
-            return userMapper.map(user);
-        } catch (DataIntegrityViolationException e) {
-            throw new DataIntegrityViolationException("Email already exists");
-        }
+        userDetailsService.updateUser(user);
+        return userMapper.map(user);
     }
 
     public void delete(Long id) {
-        userRepository.deleteById(id);
+        var user = userRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("User Not Found: " + id));
+        userDetailsService.deleteUser(user.getEmail());
     }
 }
