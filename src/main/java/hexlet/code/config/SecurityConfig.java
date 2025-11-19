@@ -1,7 +1,6 @@
 package hexlet.code.config;
 
 import hexlet.code.service.CustomUserDetailsService;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -11,6 +10,7 @@ import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
@@ -19,31 +19,28 @@ import org.springframework.web.servlet.handler.HandlerMappingIntrospector;
 
 @Configuration
 @EnableWebSecurity
+@SuppressWarnings("java:S4502") // CSRF disabled for stateless JWT authentication
 public class SecurityConfig {
 
-    @Autowired(required = false)  // Сделаем необязательным для тестов
-    private JwtDecoder jwtDecoder;
-
-    @Autowired
-    private PasswordEncoder passwordEncoder;
-
-    @Autowired
-    private CustomUserDetailsService userService;
-
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http, HandlerMappingIntrospector introspector)
+    @SuppressWarnings("java:S4502") // CSRF disabled for stateless JWT authentication
+    public SecurityFilterChain securityFilterChain(
+            HttpSecurity http,
+            HandlerMappingIntrospector introspector,
+            JwtDecoder jwtDecoder)
             throws Exception {
+
         // Если JWT не настроен (тестовый профиль) - отключаем security
         if (jwtDecoder == null) {
             return http
-                    .csrf(csrf -> csrf.disable())
+                    .csrf(AbstractHttpConfigurer::disable) // Safe for tests
                     .authorizeHttpRequests(auth -> auth.anyRequest().permitAll())
                     .build();
         }
 
         // Основная конфигурация для production/dev
         return http
-                .csrf(csrf -> csrf.disable())
+                .csrf(AbstractHttpConfigurer::disable) // Safe for stateless JWT authentication
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/", "/api/login", "/welcome").permitAll()
                         .anyRequest().authenticated()
@@ -61,7 +58,9 @@ public class SecurityConfig {
     }
 
     @Bean
-    public AuthenticationProvider daoAuthProvider(AuthenticationManagerBuilder auth) {
+    public AuthenticationProvider daoAuthProvider(
+            CustomUserDetailsService userService,
+            PasswordEncoder passwordEncoder) {
         var provider = new DaoAuthenticationProvider();
         provider.setUserDetailsService(userService);
         provider.setPasswordEncoder(passwordEncoder);
