@@ -39,8 +39,10 @@ public class UserController {
 
     @GetMapping
     @ResponseStatus(HttpStatus.OK)
-    public List<UserDTO> index() {
-        return userService.getAll();
+    public List<UserDTO> index(jakarta.servlet.http.HttpServletResponse response) {
+        var users = userService.getAll();
+        response.setHeader("X-Total-Count", String.valueOf(users.size()));
+        return users;
     }
 
     @PostMapping
