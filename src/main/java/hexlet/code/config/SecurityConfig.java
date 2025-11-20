@@ -1,7 +1,6 @@
 package hexlet.code.config;
 
 import hexlet.code.service.CustomUserDetailsService;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -23,17 +22,12 @@ import org.springframework.web.servlet.handler.HandlerMappingIntrospector;
 @EnableMethodSecurity
 public class SecurityConfig {
 
-    @Autowired
-    private JwtDecoder jwtDecoder;
-
-    @Autowired
-    private PasswordEncoder passwordEncoder;
-
-    @Autowired
-    private CustomUserDetailsService userService;
-
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http, HandlerMappingIntrospector introspector)
+    @SuppressWarnings("java:S4502") // CSRF disabled for stateless JWT authentication
+    public SecurityFilterChain securityFilterChain(
+            HttpSecurity http,
+            HandlerMappingIntrospector introspector,
+            JwtDecoder jwtDecoder)
             throws Exception {
         return http
                 .csrf(csrf -> csrf.disable())
@@ -44,13 +38,11 @@ public class SecurityConfig {
                         .requestMatchers("/index.html").permitAll()
                         .requestMatchers("/assets/**").permitAll()  // статические ресурсы
                         .requestMatchers("/favicon.ico").permitAll()
-
                         // PROTECTED endpoints - требуют аутентификации
                         .requestMatchers("/api/users**").authenticated()
                         .requestMatchers("/api/labels**").authenticated()
                         .requestMatchers("/api/tasks**").authenticated()
                         .requestMatchers("/api/task_statuses**").authenticated()
-
                         .anyRequest().authenticated() // все остальное требует аутентификации
                 )
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -66,7 +58,9 @@ public class SecurityConfig {
     }
 
     @Bean
-    public AuthenticationProvider daoAuthProvider() {
+    public AuthenticationProvider daoAuthProvider(
+            CustomUserDetailsService userService,
+            PasswordEncoder passwordEncoder) {
         var provider = new DaoAuthenticationProvider();
         provider.setUserDetailsService(userService);
         provider.setPasswordEncoder(passwordEncoder);
