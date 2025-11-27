@@ -6,10 +6,7 @@ import jakarta.persistence.EntityListeners;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.JoinTable;
 import jakarta.persistence.ManyToMany;
-import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -30,8 +27,8 @@ import java.util.List;
 @EntityListeners(AuditingEntityListener.class)
 @ToString(includeFieldNames = true, onlyExplicitlyIncluded = true)
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
-@Table(name = "tasks")
-public class Task {
+@Table(name = "labels")
+public class Label {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -40,31 +37,13 @@ public class Task {
     private Long id;
 
     @NotBlank
-    @Size(min = 1)
-    @Column(nullable = false)
+    @Size(min = 3, max = 1000)
+    @Column(unique = true, nullable = false)
     @ToString.Include
-    private String title;
+    private String name;
 
-    private Integer index;
-
-    @Column(columnDefinition = "TEXT")
-    private String content;
-
-    @ManyToOne
-    @JoinColumn(name = "task_status_id", nullable = false)
-    private TaskStatus taskStatus;
-
-    @ManyToOne
-    @JoinColumn(name = "assignee_id")
-    private User assignee;
-
-    @ManyToMany
-    @JoinTable(
-            name = "task_labels",
-            joinColumns = @JoinColumn(name = "task_id"),
-            inverseJoinColumns = @JoinColumn(name = "label_id")
-    )
-    private List<Label> labels = new ArrayList<>();
+    @ManyToMany(mappedBy = "labels")
+    private List<Task> tasks = new ArrayList<>();
 
     @CreatedDate
     private LocalDate createdAt;

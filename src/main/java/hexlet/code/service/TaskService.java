@@ -69,4 +69,8 @@ public class TaskService {
     public boolean existsByTaskStatusId(Long taskStatusId) {
         return taskRepository.existsByTaskStatusId(taskStatusId);
     }
+
+    public boolean existsByLabelId(Long labelId) {
+        return taskRepository.existsByLabelId(labelId);
+    }
 }

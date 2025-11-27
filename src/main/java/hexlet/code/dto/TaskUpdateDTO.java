@@ -6,6 +6,8 @@ import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.util.List;
+
 @Getter
 @Setter
 public class TaskUpdateDTO {
@@ -21,4 +23,7 @@ public class TaskUpdateDTO {
 
     @JsonProperty("assignee_id")
     private JsonNullable<Long> assigneeId = JsonNullable.undefined();
+
+    @JsonProperty("taskLabelIds")
+    private JsonNullable<List<Long>> taskLabelIds = JsonNullable.undefined();
 }
