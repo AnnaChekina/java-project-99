@@ -24,6 +24,9 @@ public class UserService {
     @Autowired
     private CustomUserDetailsService userDetailsService;
 
+    @Autowired
+    private TaskService taskService;
+
     public List<UserDTO> getAll() {
         var users = userRepository.findAll();
         return users.stream()
@@ -68,6 +71,11 @@ public class UserService {
     public void delete(Long id) {
         var user = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User Not Found: " + id));
+
+        if (taskService.existsByAssigneeId(id)) {
+            throw new DataIntegrityViolationException("Cannot delete user: user has assigned tasks");
+        }
+
         userDetailsService.deleteUser(user.getEmail());
     }
 }

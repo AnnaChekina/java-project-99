@@ -22,6 +22,9 @@ public class TaskStatusService {
     @Autowired
     private TaskStatusMapper taskStatusMapper;
 
+    @Autowired
+    private TaskService taskService;
+
     public List<TaskStatusDTO> getAll() {
         var taskStatuses = taskStatusRepository.findAll();
         return taskStatuses.stream()
@@ -63,6 +66,11 @@ public class TaskStatusService {
     public void delete(Long id) {
         var taskStatus = taskStatusRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("TaskStatus Not Found: " + id));
+
+        if (taskService.existsByTaskStatusId(id)) {
+            throw new DataIntegrityViolationException("Cannot delete task status: status is used in tasks");
+        }
+
         taskStatusRepository.delete(taskStatus);
     }
 

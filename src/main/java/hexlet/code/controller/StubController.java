@@ -19,11 +19,4 @@ public class StubController {
         response.setHeader("X-Total-Count", "0");
         return Collections.emptyList();
     }
-
-    @GetMapping("/tasks")
-    @ResponseStatus(HttpStatus.OK)
-    public List<Object> getTasks(jakarta.servlet.http.HttpServletResponse response) {
-        response.setHeader("X-Total-Count", "0");
-        return Collections.emptyList();
-    }
 }
