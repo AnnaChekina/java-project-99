@@ -2,12 +2,18 @@ package hexlet.code.service;
 
 import hexlet.code.dto.TaskCreateDTO;
 import hexlet.code.dto.TaskDTO;
+import hexlet.code.dto.TaskParamsDTO;
 import hexlet.code.dto.TaskUpdateDTO;
 import hexlet.code.exception.ResourceNotFoundException;
 import hexlet.code.mapper.TaskMapper;
+import hexlet.code.model.Task;
 import hexlet.code.repository.TaskRepository;
+import hexlet.code.specification.TaskSpecification;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -21,11 +27,20 @@ public class TaskService {
     @Autowired
     private TaskMapper taskMapper;
 
+    @Autowired
+    private TaskSpecification taskSpecification;
+
     public List<TaskDTO> getAll() {
         var tasks = taskRepository.findAll();
         return tasks.stream()
                 .map(taskMapper::map)
                 .toList();
+    }
+
+    public Page<TaskDTO> getFiltered(TaskParamsDTO params, Pageable pageable) {
+        Specification<Task> spec = taskSpecification.build(params);
+        var tasks = taskRepository.findAll(spec, pageable);
+        return tasks.map(taskMapper::map);
     }
 
     public TaskDTO findById(Long id) {

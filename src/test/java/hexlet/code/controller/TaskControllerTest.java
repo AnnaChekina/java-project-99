@@ -3,9 +3,11 @@ package hexlet.code.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import hexlet.code.dto.TaskCreateDTO;
 import hexlet.code.dto.TaskUpdateDTO;
+import hexlet.code.model.Label;
 import hexlet.code.model.Task;
 import hexlet.code.model.TaskStatus;
 import hexlet.code.model.User;
+import hexlet.code.repository.LabelRepository;
 import hexlet.code.repository.TaskRepository;
 import hexlet.code.repository.TaskStatusRepository;
 import hexlet.code.repository.UserRepository;
@@ -22,6 +24,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.LocalDate;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasSize;
@@ -44,6 +47,9 @@ class TaskControllerTest {
     private ObjectMapper objectMapper;
 
     @Autowired
+    private LabelRepository labelRepository;
+
+    @Autowired
     private TaskRepository taskRepository;
 
     @Autowired
@@ -55,6 +61,8 @@ class TaskControllerTest {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
+    private Label bugLabel;
+    private Label featureLabel;
     private TaskStatus testStatus;
     private User testUser;
 
@@ -63,6 +71,7 @@ class TaskControllerTest {
         taskRepository.deleteAll();
         taskStatusRepository.deleteAll();
         userRepository.deleteAll();
+        labelRepository.deleteAll();
 
         testStatus = new TaskStatus();
         testStatus.setName("In Progress");
@@ -78,6 +87,16 @@ class TaskControllerTest {
         testUser.setCreatedAt(LocalDate.now());
         testUser.setUpdatedAt(LocalDate.now());
         testUser = userRepository.save(testUser);
+
+        bugLabel = new Label();
+        bugLabel.setName("bug");
+        bugLabel.setCreatedAt(LocalDate.now());
+        bugLabel = labelRepository.save(bugLabel);
+
+        featureLabel = new Label();
+        featureLabel.setName("feature");
+        featureLabel.setCreatedAt(LocalDate.now());
+        featureLabel = labelRepository.save(featureLabel);
     }
 
     @Test
@@ -339,6 +358,97 @@ class TaskControllerTest {
                 .andExpect(jsonPath("$.status").value("in_progress"))
                 .andExpect(jsonPath("$.assignee_id").value(testUser.getId()))
                 .andExpect(jsonPath("$.createdAt").exists());
+    }
+
+    @Test
+    @WithMockUser
+    void testFilterTasksByTitle() throws Exception {
+        Task task1 = createTestTask("Create new feature", 1, testStatus, testUser);
+        Task task2 = createTestTask("Fix old bug", 2, testStatus, testUser);
+
+        mockMvc.perform(get("/api/tasks?titleCont=feature"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].title").value("Create new feature"));
+    }
+
+    @Test
+    @WithMockUser
+    void testFilterTasksByAssignee() throws Exception {
+        User anotherUser = new User();
+        anotherUser.setEmail("another@example.com");
+        anotherUser.setPasswordDigest(passwordEncoder.encode("password"));
+        anotherUser.setFirstName("Jane");
+        anotherUser.setLastName("Smith");
+        anotherUser = userRepository.save(anotherUser);
+
+        Task task1 = createTestTask("Task for user 1", 1, testStatus, testUser);
+        Task task2 = createTestTask("Task for user 2", 2, testStatus, anotherUser);
+
+        mockMvc.perform(get("/api/tasks?assigneeId=" + testUser.getId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].title").value("Task for user 1"))
+                .andExpect(jsonPath("$[0].assignee_id").value(testUser.getId()));
+    }
+
+    @Test
+    @WithMockUser
+    void testFilterTasksByStatus() throws Exception {
+        TaskStatus completedStatus = new TaskStatus();
+        completedStatus.setName("Completed");
+        completedStatus.setSlug("completed");
+        completedStatus = taskStatusRepository.save(completedStatus);
+
+        Task task1 = createTestTask("In Progress Task", 1, testStatus, testUser);
+        Task task2 = createTestTask("Completed Task", 2, completedStatus, testUser);
+
+        mockMvc.perform(get("/api/tasks?status=completed"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].title").value("Completed Task"))
+                .andExpect(jsonPath("$[0].status").value("completed"));
+    }
+
+    @Test
+    @WithMockUser
+    void testFilterTasksByLabel() throws Exception {
+        Task task1 = createTestTask("Bug Task", 1, testStatus, testUser);
+        task1.setLabels(List.of(bugLabel));
+        taskRepository.save(task1);
+
+        Task task2 = createTestTask("Feature Task", 2, testStatus, testUser);
+        task2.setLabels(List.of(featureLabel));
+        taskRepository.save(task2);
+
+        mockMvc.perform(get("/api/tasks?labelId=" + bugLabel.getId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].title").value("Bug Task"));
+    }
+
+    @Test
+    @WithMockUser
+    void testFilterTasksByMultipleCriteria() throws Exception {
+        Task task1 = createTestTask("Fix critical bug", 1, testStatus, testUser);
+        task1.setLabels(List.of(bugLabel));
+        taskRepository.save(task1);
+
+        mockMvc.perform(get("/api/tasks?titleCont=critical&assigneeId=" + testUser.getId()
+                        + "&status=in_progress&labelId=" + bugLabel.getId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].title").value("Fix critical bug"));
+    }
+
+    @Test
+    @WithMockUser
+    void testFilterTasksNoResults() throws Exception {
+        createTestTask("Test Task", 1, testStatus, testUser);
+
+        mockMvc.perform(get("/api/tasks?titleCont=nonexistent"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(0)));
     }
 
     private Task createTestTask(String title, Integer index, TaskStatus status, User assignee) {
