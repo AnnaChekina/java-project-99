@@ -60,8 +60,9 @@ public class UserController {
     @PutMapping("/{id}")
     @ResponseStatus(HttpStatus.OK)
     public UserDTO update(@RequestBody @Valid UserUpdateDTO userData, @PathVariable Long id) {
-        var userToUpdate = userRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("User Not Found: " + id));
+        if (!userRepository.existsById(id)) {
+            throw new ResourceNotFoundException("User Not Found: " + id);
+        }
 
         User currentUser = userUtils.getCurrentUser();
         if (currentUser == null || !currentUser.getId().equals(id)) {
@@ -74,8 +75,9 @@ public class UserController {
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@PathVariable Long id) {
-        var userToDelete = userRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("User Not Found: " + id));
+        if (!userRepository.existsById(id)) {
+            throw new ResourceNotFoundException("User Not Found: " + id);
+        }
 
         User currentUser = userUtils.getCurrentUser();
         if (currentUser == null || !currentUser.getId().equals(id)) {

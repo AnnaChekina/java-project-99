@@ -31,10 +31,8 @@ public class AuthenticationController {
                     authRequest.getPassword()
             );
 
-            var authenticated = authenticationManager.authenticate(authentication);
-
-            var token = jwtUtils.generateToken(authRequest.getUsername());
-            return token;
+            authenticationManager.authenticate(authentication);
+            return jwtUtils.generateToken(authRequest.getUsername());
 
         } catch (BadCredentialsException e) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid credentials");

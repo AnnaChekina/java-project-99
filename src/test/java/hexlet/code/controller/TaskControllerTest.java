@@ -64,7 +64,9 @@ class TaskControllerTest {
     private Label bugLabel;
     private Label featureLabel;
     private TaskStatus testStatus;
+    private TaskStatus completedStatus;
     private User testUser;
+    private User anotherUser;
 
     @BeforeEach
     void setUp() {
@@ -73,11 +75,18 @@ class TaskControllerTest {
         userRepository.deleteAll();
         labelRepository.deleteAll();
 
+        // Создаем статусы задач
         testStatus = new TaskStatus();
         testStatus.setName("In Progress");
         testStatus.setSlug("in_progress");
         testStatus.setCreatedAt(LocalDate.now());
         testStatus = taskStatusRepository.save(testStatus);
+
+        completedStatus = new TaskStatus();
+        completedStatus.setName("Completed");
+        completedStatus.setSlug("completed");
+        completedStatus.setCreatedAt(LocalDate.now());
+        completedStatus = taskStatusRepository.save(completedStatus);
 
         testUser = new User();
         testUser.setEmail("test@example.com");
@@ -87,6 +96,15 @@ class TaskControllerTest {
         testUser.setCreatedAt(LocalDate.now());
         testUser.setUpdatedAt(LocalDate.now());
         testUser = userRepository.save(testUser);
+
+        anotherUser = new User();
+        anotherUser.setEmail("another@example.com");
+        anotherUser.setPasswordDigest(passwordEncoder.encode("password"));
+        anotherUser.setFirstName("Jane");
+        anotherUser.setLastName("Smith");
+        anotherUser.setCreatedAt(LocalDate.now());
+        anotherUser.setUpdatedAt(LocalDate.now());
+        anotherUser = userRepository.save(anotherUser);
 
         bugLabel = new Label();
         bugLabel.setName("bug");
@@ -221,38 +239,23 @@ class TaskControllerTest {
     void testUpdateTaskAssignee() throws Exception {
         Task task = createTestTask("Task with Assignee", 1, testStatus, testUser);
 
-        User newUser = new User();
-        newUser.setEmail("newuser@example.com");
-        newUser.setPasswordDigest(passwordEncoder.encode("password"));
-        newUser.setFirstName("Jane");
-        newUser.setLastName("Smith");
-        newUser.setCreatedAt(LocalDate.now());
-        newUser.setUpdatedAt(LocalDate.now());
-        newUser = userRepository.save(newUser);
-
         TaskUpdateDTO taskUpdateDTO = new TaskUpdateDTO();
-        taskUpdateDTO.setAssigneeId(JsonNullable.of(newUser.getId()));
+        taskUpdateDTO.setAssigneeId(JsonNullable.of(anotherUser.getId()));
 
         mockMvc.perform(put("/api/tasks/" + task.getId())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(taskUpdateDTO)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.assignee_id").value(newUser.getId()));
+                .andExpect(jsonPath("$.assignee_id").value(anotherUser.getId()));
 
         var updatedTask = taskRepository.findById(task.getId()).orElseThrow();
-        assertThat(updatedTask.getAssignee().getId()).isEqualTo(newUser.getId());
+        assertThat(updatedTask.getAssignee().getId()).isEqualTo(anotherUser.getId());
     }
 
     @Test
     @WithMockUser
     void testUpdateTaskStatus() throws Exception {
         Task task = createTestTask("Task for Status Update", 1, testStatus, testUser);
-
-        TaskStatus newStatus = new TaskStatus();
-        newStatus.setName("Completed");
-        newStatus.setSlug("completed");
-        newStatus.setCreatedAt(LocalDate.now());
-        newStatus = taskStatusRepository.save(newStatus);
 
         TaskUpdateDTO taskUpdateDTO = new TaskUpdateDTO();
         taskUpdateDTO.setStatus(JsonNullable.of("completed"));
@@ -264,7 +267,7 @@ class TaskControllerTest {
                 .andExpect(jsonPath("$.status").value("completed"));
 
         var updatedTask = taskRepository.findById(task.getId()).orElseThrow();
-        assertThat(updatedTask.getTaskStatus().getId()).isEqualTo(newStatus.getId());
+        assertThat(updatedTask.getTaskStatus().getId()).isEqualTo(completedStatus.getId());
     }
 
     @Test
@@ -375,13 +378,6 @@ class TaskControllerTest {
     @Test
     @WithMockUser
     void testFilterTasksByAssignee() throws Exception {
-        User anotherUser = new User();
-        anotherUser.setEmail("another@example.com");
-        anotherUser.setPasswordDigest(passwordEncoder.encode("password"));
-        anotherUser.setFirstName("Jane");
-        anotherUser.setLastName("Smith");
-        anotherUser = userRepository.save(anotherUser);
-
         Task task1 = createTestTask("Task for user 1", 1, testStatus, testUser);
         Task task2 = createTestTask("Task for user 2", 2, testStatus, anotherUser);
 
@@ -395,11 +391,6 @@ class TaskControllerTest {
     @Test
     @WithMockUser
     void testFilterTasksByStatus() throws Exception {
-        TaskStatus completedStatus = new TaskStatus();
-        completedStatus.setName("Completed");
-        completedStatus.setSlug("completed");
-        completedStatus = taskStatusRepository.save(completedStatus);
-
         Task task1 = createTestTask("In Progress Task", 1, testStatus, testUser);
         Task task2 = createTestTask("Completed Task", 2, completedStatus, testUser);
 
