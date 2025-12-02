@@ -1,4 +1,3 @@
-src/main/resources/certs/*.pem
 HELP.md
 .gradle
 build/

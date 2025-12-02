@@ -11,7 +11,7 @@ run:
 	./gradlew bootRun
 
 install:
-	./gradlew instinstallDist
+	./gradlew installDist
 
 run-dist:
 	./build/install/java-project-99/bin/java-project-99
@@ -31,4 +31,4 @@ report:
 check-updates:
 	./gradlew dependencyUpdates
 
-.PHONY: build
+.PHONY: setup build test run

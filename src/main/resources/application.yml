@@ -26,10 +26,6 @@ logging:
     org.hibernate.SQL: DEBUG
     org.hibernate.type.descriptor.sql.BasicBinder: TRACE
 
-sentry:
-  dsn: https://examplePublicKey@o0.ingest.sentry.io/0
-  tracesSampleRate: 1.0
-
 rsa:
   private-key: classpath:certs/private.pem
   public-key: classpath:certs/public.pem
