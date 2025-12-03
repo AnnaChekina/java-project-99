@@ -45,4 +45,14 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(ex.getStatusCode())
                 .body(ex.getReason());
     }
+
+    // Обработчик для всех остальных исключений
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<Map<String, String>> handleAllExceptions(Exception ex) {
+        Map<String, String> response = new HashMap<>();
+        response.put("message", "An unexpected error occurred");
+        response.put("error", ex.getClass().getSimpleName());
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(response);
+    }
 }
