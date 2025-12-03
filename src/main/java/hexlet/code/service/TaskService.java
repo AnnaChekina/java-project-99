@@ -4,84 +4,19 @@ import hexlet.code.dto.TaskCreateDTO;
 import hexlet.code.dto.TaskDTO;
 import hexlet.code.dto.TaskParamsDTO;
 import hexlet.code.dto.TaskUpdateDTO;
-import hexlet.code.exception.ResourceNotFoundException;
-import hexlet.code.mapper.TaskMapper;
-import hexlet.code.model.Task;
-import hexlet.code.repository.TaskRepository;
-import hexlet.code.specification.TaskSpecification;
-import lombok.AllArgsConstructor;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.jpa.domain.Specification;
-import org.springframework.stereotype.Service;
 
 import java.util.List;
 
-@Service
-@AllArgsConstructor
-public class TaskService {
-
-    private final TaskRepository taskRepository;
-    private final TaskMapper taskMapper;
-    private final TaskSpecification taskSpecification;
-
-    public List<TaskDTO> getAll() {
-        var tasks = taskRepository.findAll();
-        return tasks.stream()
-                .map(taskMapper::map)
-                .toList();
-    }
-
-    public Page<TaskDTO> getFiltered(TaskParamsDTO params, Pageable pageable) {
-        Specification<Task> spec = taskSpecification.build(params);
-        var tasks = taskRepository.findAll(spec, pageable);
-        return tasks.map(taskMapper::map);
-    }
-
-    public TaskDTO findById(Long id) {
-        var task = taskRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Task Not Found: " + id));
-        return taskMapper.map(task);
-    }
-
-    public TaskDTO create(TaskCreateDTO taskData) {
-        var task = taskMapper.map(taskData);
-        try {
-            taskRepository.save(task);
-            return taskMapper.map(task);
-        } catch (DataIntegrityViolationException e) {
-            throw new DataIntegrityViolationException("Task creation failed due to data integrity violation");
-        }
-    }
-
-    public TaskDTO update(TaskUpdateDTO taskData, Long id) {
-        var task = taskRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Task Not Found: " + id));
-        taskMapper.update(taskData, task);
-        try {
-            taskRepository.save(task);
-            return taskMapper.map(task);
-        } catch (DataIntegrityViolationException e) {
-            throw new DataIntegrityViolationException("Task update failed due to data integrity violation");
-        }
-    }
-
-    public void delete(Long id) {
-        var task = taskRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Task Not Found: " + id));
-        taskRepository.delete(task);
-    }
-
-    public boolean existsByAssigneeId(Long assigneeId) {
-        return taskRepository.existsByAssigneeId(assigneeId);
-    }
-
-    public boolean existsByTaskStatusId(Long taskStatusId) {
-        return taskRepository.existsByTaskStatusId(taskStatusId);
-    }
-
-    public boolean existsByLabelId(Long labelId) {
-        return taskRepository.existsByLabelId(labelId);
-    }
+public interface TaskService {
+    List<TaskDTO> getAll();
+    Page<TaskDTO> getFiltered(TaskParamsDTO params, Pageable pageable);
+    TaskDTO findById(Long id);
+    TaskDTO create(TaskCreateDTO taskData);
+    TaskDTO update(TaskUpdateDTO taskData, Long id);
+    void delete(Long id);
+    boolean existsByAssigneeId(Long assigneeId);
+    boolean existsByTaskStatusId(Long taskStatusId);
+    boolean existsByLabelId(Long labelId);
 }
