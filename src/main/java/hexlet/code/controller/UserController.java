@@ -9,7 +9,7 @@ import hexlet.code.repository.UserRepository;
 import hexlet.code.service.UserService;
 import hexlet.code.util.UserUtils;
 import jakarta.validation.Valid;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.AllArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -26,16 +26,12 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/users")
+@AllArgsConstructor
 public class UserController {
 
-    @Autowired
-    private UserService userService;
-
-    @Autowired
-    private UserUtils userUtils;
-
-    @Autowired
-    private UserRepository userRepository;
+    private final UserService userService;
+    private final UserUtils userUtils;
+    private final UserRepository userRepository;
 
     @GetMapping
     @ResponseStatus(HttpStatus.OK)
