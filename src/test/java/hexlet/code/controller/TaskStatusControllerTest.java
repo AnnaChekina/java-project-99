@@ -1,7 +1,9 @@
 package hexlet.code.controller;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import hexlet.code.dto.TaskStatusCreateDTO;
+import hexlet.code.dto.TaskStatusDTO;
 import hexlet.code.dto.TaskStatusUpdateDTO;
 import hexlet.code.model.Task;
 import hexlet.code.model.TaskStatus;
@@ -17,8 +19,11 @@ import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 
 import java.time.LocalDate;
+import java.util.List;
+import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasSize;
@@ -65,13 +70,33 @@ class TaskStatusControllerTest {
         status2.setSlug("published");
         taskStatusRepository.save(status2);
 
-        mockMvc.perform(get("/api/task_statuses"))
+        MvcResult result = mockMvc.perform(get("/api/task_statuses"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(2)))
-                .andExpect(jsonPath("$[0].name").value("Draft"))
-                .andExpect(jsonPath("$[0].slug").value("draft"))
-                .andExpect(jsonPath("$[1].name").value("Published"))
-                .andExpect(jsonPath("$[1].slug").value("published"));
+                .andReturn();
+
+        String responseContent = result.getResponse().getContentAsString();
+        List<TaskStatusDTO> statusesFromController = objectMapper.readValue(
+                responseContent,
+                new TypeReference<List<TaskStatusDTO>>() { }
+        );
+
+        List<TaskStatus> statusesFromDB = taskStatusRepository.findAll();
+
+        assertThat(statusesFromController).hasSize(2);
+        assertThat(statusesFromDB).hasSize(2);
+
+        List<String> controllerNames = statusesFromController.stream()
+                .map(TaskStatusDTO::getName)
+                .sorted()
+                .collect(Collectors.toList());
+
+        List<String> dbNames = statusesFromDB.stream()
+                .map(TaskStatus::getName)
+                .sorted()
+                .collect(Collectors.toList());
+
+        assertThat(controllerNames).containsExactlyElementsOf(dbNames);
     }
 
     @Test
@@ -96,17 +121,20 @@ class TaskStatusControllerTest {
         taskStatusCreateDTO.setName("New Status");
         taskStatusCreateDTO.setSlug("new_status");
 
-        mockMvc.perform(post("/api/task_statuses")
+        MvcResult result = mockMvc.perform(post("/api/task_statuses")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(taskStatusCreateDTO)))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.name").value("New Status"))
-                .andExpect(jsonPath("$.slug").value("new_status"));
+                .andReturn();
 
-        var createdStatus = taskStatusRepository.findBySlug("new_status");
-        assertThat(createdStatus).isPresent();
-        assertThat(createdStatus.get().getName()).isEqualTo("New Status");
-        assertThat(createdStatus.get().getSlug()).isEqualTo("new_status");
+        String responseContent = result.getResponse().getContentAsString();
+        TaskStatusDTO statusFromController = objectMapper.readValue(responseContent, TaskStatusDTO.class);
+
+        var statusFromDB = taskStatusRepository.findBySlug("new_status").orElse(null);
+
+        assertThat(statusFromDB).isNotNull();
+        assertThat(statusFromController.getName()).isEqualTo(statusFromDB.getName());
+        assertThat(statusFromController.getSlug()).isEqualTo(statusFromDB.getSlug());
     }
 
     @Test
@@ -121,16 +149,20 @@ class TaskStatusControllerTest {
         taskStatusUpdateDTO.setName(JsonNullable.of("Updated Name"));
         taskStatusUpdateDTO.setSlug(JsonNullable.of("updated_slug"));
 
-        mockMvc.perform(put("/api/task_statuses/" + savedStatus.getId())
+        MvcResult result = mockMvc.perform(put("/api/task_statuses/" + savedStatus.getId())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(taskStatusUpdateDTO)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.name").value("Updated Name"))
-                .andExpect(jsonPath("$.slug").value("updated_slug"));
+                .andReturn();
 
-        var updatedStatus = taskStatusRepository.findById(savedStatus.getId()).orElseThrow();
-        assertThat(updatedStatus.getName()).isEqualTo("Updated Name");
-        assertThat(updatedStatus.getSlug()).isEqualTo("updated_slug");
+        String responseContent = result.getResponse().getContentAsString();
+        TaskStatusDTO statusFromController = objectMapper.readValue(responseContent, TaskStatusDTO.class);
+
+        var statusFromDB = taskStatusRepository.findById(savedStatus.getId()).orElseThrow();
+
+        assertThat(statusFromController.getName()).isEqualTo("Updated Name");
+        assertThat(statusFromDB.getName()).isEqualTo("Updated Name");
+        assertThat(statusFromController.getSlug()).isEqualTo(statusFromDB.getSlug());
     }
 
     @Test
@@ -144,16 +176,20 @@ class TaskStatusControllerTest {
         TaskStatusUpdateDTO taskStatusUpdateDTO = new TaskStatusUpdateDTO();
         taskStatusUpdateDTO.setName(JsonNullable.of("Partially Updated Name"));
 
-        mockMvc.perform(put("/api/task_statuses/" + savedStatus.getId())
+        MvcResult result = mockMvc.perform(put("/api/task_statuses/" + savedStatus.getId())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(taskStatusUpdateDTO)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.name").value("Partially Updated Name"))
-                .andExpect(jsonPath("$.slug").value("original_slug"));
+                .andReturn();
 
-        var updatedStatus = taskStatusRepository.findById(savedStatus.getId()).orElseThrow();
-        assertThat(updatedStatus.getName()).isEqualTo("Partially Updated Name");
-        assertThat(updatedStatus.getSlug()).isEqualTo("original_slug");
+        String responseContent = result.getResponse().getContentAsString();
+        TaskStatusDTO statusFromController = objectMapper.readValue(responseContent, TaskStatusDTO.class);
+
+        var statusFromDB = taskStatusRepository.findById(savedStatus.getId()).orElseThrow();
+
+        assertThat(statusFromController.getName()).isEqualTo("Partially Updated Name");
+        assertThat(statusFromDB.getName()).isEqualTo("Partially Updated Name");
+        assertThat(statusFromController.getSlug()).isEqualTo(statusFromDB.getSlug());
     }
 
     @Test
@@ -192,8 +228,8 @@ class TaskStatusControllerTest {
     @WithMockUser
     void testCreateTaskStatusWithInvalidData() throws Exception {
         TaskStatusCreateDTO taskStatusCreateDTO = new TaskStatusCreateDTO();
-        taskStatusCreateDTO.setName(""); // Пустое имя
-        taskStatusCreateDTO.setSlug(""); // Пустой слаг
+        taskStatusCreateDTO.setName("");
+        taskStatusCreateDTO.setSlug("");
 
         mockMvc.perform(post("/api/task_statuses")
                         .contentType(MediaType.APPLICATION_JSON)

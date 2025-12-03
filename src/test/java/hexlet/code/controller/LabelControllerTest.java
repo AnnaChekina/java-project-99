@@ -1,7 +1,9 @@
 package hexlet.code.controller;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import hexlet.code.dto.LabelCreateDTO;
+import hexlet.code.dto.LabelDTO;
 import hexlet.code.dto.LabelUpdateDTO;
 import hexlet.code.model.Label;
 import hexlet.code.model.Task;
@@ -19,9 +21,11 @@ import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasSize;
@@ -77,11 +81,33 @@ class LabelControllerTest {
         label2.setName("feature");
         labelRepository.save(label2);
 
-        mockMvc.perform(get("/api/labels"))
+        MvcResult result = mockMvc.perform(get("/api/labels"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(2)))
-                .andExpect(jsonPath("$[0].name").value("bug"))
-                .andExpect(jsonPath("$[1].name").value("feature"));
+                .andReturn();
+
+        String responseContent = result.getResponse().getContentAsString();
+        List<LabelDTO> labelsFromController = objectMapper.readValue(
+                responseContent,
+                new TypeReference<List<LabelDTO>>() { }
+        );
+
+        List<Label> labelsFromDB = labelRepository.findAll();
+
+        assertThat(labelsFromController).hasSize(2);
+        assertThat(labelsFromDB).hasSize(2);
+
+        List<String> controllerLabelNames = labelsFromController.stream()
+                .map(LabelDTO::getName)
+                .sorted()
+                .collect(Collectors.toList());
+
+        List<String> dbLabelNames = labelsFromDB.stream()
+                .map(Label::getName)
+                .sorted()
+                .collect(Collectors.toList());
+
+        assertThat(controllerLabelNames).containsExactlyElementsOf(dbLabelNames);
     }
 
     @Test
@@ -103,15 +129,20 @@ class LabelControllerTest {
         LabelCreateDTO labelCreateDTO = new LabelCreateDTO();
         labelCreateDTO.setName("new label");
 
-        mockMvc.perform(post("/api/labels")
+        MvcResult result = mockMvc.perform(post("/api/labels")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(labelCreateDTO)))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.name").value("new label"));
+                .andReturn();
 
-        var createdLabel = labelRepository.findByName("new label");
-        assertThat(createdLabel).isPresent();
-        assertThat(createdLabel.get().getName()).isEqualTo("new label");
+        String responseContent = result.getResponse().getContentAsString();
+        LabelDTO labelFromController = objectMapper.readValue(responseContent, LabelDTO.class);
+
+        var labelFromDB = labelRepository.findByName("new label").orElse(null);
+
+        assertThat(labelFromDB).isNotNull();
+        assertThat(labelFromController.getName()).isEqualTo(labelFromDB.getName());
+        assertThat(labelFromController.getId()).isEqualTo(labelFromDB.getId());
     }
 
     @Test
@@ -124,14 +155,20 @@ class LabelControllerTest {
         LabelUpdateDTO labelUpdateDTO = new LabelUpdateDTO();
         labelUpdateDTO.setName(JsonNullable.of("Updated Name"));
 
-        mockMvc.perform(put("/api/labels/" + savedLabel.getId())
+        MvcResult result = mockMvc.perform(put("/api/labels/" + savedLabel.getId())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(labelUpdateDTO)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.name").value("Updated Name"));
+                .andReturn();
 
-        var updatedLabel = labelRepository.findById(savedLabel.getId()).orElseThrow();
-        assertThat(updatedLabel.getName()).isEqualTo("Updated Name");
+        String responseContent = result.getResponse().getContentAsString();
+        LabelDTO labelFromController = objectMapper.readValue(responseContent, LabelDTO.class);
+
+        var labelFromDB = labelRepository.findById(savedLabel.getId()).orElseThrow();
+
+        assertThat(labelFromController.getName()).isEqualTo("Updated Name");
+        assertThat(labelFromDB.getName()).isEqualTo("Updated Name");
+        assertThat(labelFromController.getId()).isEqualTo(labelFromDB.getId());
     }
 
     @Test
@@ -140,6 +177,8 @@ class LabelControllerTest {
         Label label = new Label();
         label.setName("To Delete");
         Label savedLabel = labelRepository.save(label);
+
+        assertThat(labelRepository.findById(savedLabel.getId())).isPresent();
 
         mockMvc.perform(delete("/api/labels/" + savedLabel.getId()))
                 .andExpect(status().isNoContent());
@@ -169,7 +208,7 @@ class LabelControllerTest {
     @WithMockUser
     void testCreateLabelWithInvalidData() throws Exception {
         LabelCreateDTO labelCreateDTO = new LabelCreateDTO();
-        labelCreateDTO.setName("ab"); // Слишком короткое имя
+        labelCreateDTO.setName("ab");
 
         mockMvc.perform(post("/api/labels")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -191,6 +230,32 @@ class LabelControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(labelCreateDTO)))
                 .andExpect(status().isConflict());
+    }
+
+    @Test
+    @WithMockUser
+    void testGetNonExistentLabel() throws Exception {
+        mockMvc.perform(get("/api/labels/999"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @WithMockUser
+    void testUpdateNonExistentLabel() throws Exception {
+        LabelUpdateDTO labelUpdateDTO = new LabelUpdateDTO();
+        labelUpdateDTO.setName(JsonNullable.of("Updated Name"));
+
+        mockMvc.perform(put("/api/labels/999")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(labelUpdateDTO)))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @WithMockUser
+    void testDeleteNonExistentLabel() throws Exception {
+        mockMvc.perform(delete("/api/labels/999"))
+                .andExpect(status().isNotFound());
     }
 
     @Test

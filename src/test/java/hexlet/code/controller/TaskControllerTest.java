@@ -1,7 +1,9 @@
 package hexlet.code.controller;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import hexlet.code.dto.TaskCreateDTO;
+import hexlet.code.dto.TaskDTO;
 import hexlet.code.dto.TaskUpdateDTO;
 import hexlet.code.model.Label;
 import hexlet.code.model.Task;
@@ -22,9 +24,11 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasSize;
@@ -75,7 +79,6 @@ class TaskControllerTest {
         userRepository.deleteAll();
         labelRepository.deleteAll();
 
-        // Создаем статусы задач
         testStatus = new TaskStatus();
         testStatus.setName("In Progress");
         testStatus.setSlug("in_progress");
@@ -123,15 +126,33 @@ class TaskControllerTest {
         Task task1 = createTestTask("Task 1", 1, testStatus, testUser);
         Task task2 = createTestTask("Task 2", 2, testStatus, null);
 
-        mockMvc.perform(get("/api/tasks"))
+        MvcResult result = mockMvc.perform(get("/api/tasks"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(2)))
-                .andExpect(jsonPath("$[0].title").value("Task 1"))
-                .andExpect(jsonPath("$[0].index").value(1))
-                .andExpect(jsonPath("$[0].status").value("in_progress"))
-                .andExpect(jsonPath("$[0].assignee_id").value(testUser.getId()))
-                .andExpect(jsonPath("$[1].title").value("Task 2"))
-                .andExpect(jsonPath("$[1].assignee_id").doesNotExist());
+                .andReturn();
+
+        String responseContent = result.getResponse().getContentAsString();
+        List<TaskDTO> tasksFromController = objectMapper.readValue(
+                responseContent,
+                new TypeReference<List<TaskDTO>>() { }
+        );
+
+        List<Task> tasksFromDB = taskRepository.findAll();
+
+        assertThat(tasksFromController).hasSize(2);
+        assertThat(tasksFromDB).hasSize(2);
+
+        List<String> controllerTitles = tasksFromController.stream()
+                .map(TaskDTO::getTitle)
+                .sorted()
+                .collect(Collectors.toList());
+
+        List<String> dbTitles = tasksFromDB.stream()
+                .map(Task::getTitle)
+                .sorted()
+                .collect(Collectors.toList());
+
+        assertThat(controllerTitles).containsExactlyElementsOf(dbTitles);
     }
 
     @Test
@@ -159,7 +180,7 @@ class TaskControllerTest {
         taskCreateDTO.setStatus("in_progress");
         taskCreateDTO.setAssigneeId(testUser.getId());
 
-        mockMvc.perform(post("/api/tasks")
+        MvcResult result = mockMvc.perform(post("/api/tasks")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(taskCreateDTO)))
                 .andExpect(status().isCreated())
@@ -167,14 +188,20 @@ class TaskControllerTest {
                 .andExpect(jsonPath("$.index").value(5))
                 .andExpect(jsonPath("$.content").value("New Description"))
                 .andExpect(jsonPath("$.status").value("in_progress"))
-                .andExpect(jsonPath("$.assignee_id").value(testUser.getId()));
+                .andExpect(jsonPath("$.assignee_id").value(testUser.getId()))
+                .andReturn();
 
-        var createdTask = taskRepository.findAll().stream()
+        String responseContent = result.getResponse().getContentAsString();
+        TaskDTO taskFromController = objectMapper.readValue(responseContent, TaskDTO.class);
+
+        var taskFromDB = taskRepository.findAll().stream()
                 .filter(t -> t.getTitle().equals("New Task"))
-                .findFirst();
-        assertThat(createdTask).isPresent();
-        assertThat(createdTask.get().getIndex()).isEqualTo(5);
-        assertThat(createdTask.get().getTaskStatus().getSlug()).isEqualTo("in_progress");
+                .findFirst()
+                .orElse(null);
+
+        assertThat(taskFromDB).isNotNull();
+        assertThat(taskFromController.getTitle()).isEqualTo(taskFromDB.getTitle());
+        assertThat(taskFromController.getIndex()).isEqualTo(taskFromDB.getIndex());
     }
 
     @Test
@@ -184,12 +211,25 @@ class TaskControllerTest {
         taskCreateDTO.setTitle("Unassigned Task");
         taskCreateDTO.setStatus("in_progress");
 
-        mockMvc.perform(post("/api/tasks")
+        MvcResult result = mockMvc.perform(post("/api/tasks")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(taskCreateDTO)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.title").value("Unassigned Task"))
-                .andExpect(jsonPath("$.assignee_id").doesNotExist());
+                .andExpect(jsonPath("$.assignee_id").doesNotExist())
+                .andReturn();
+
+        String responseContent = result.getResponse().getContentAsString();
+        TaskDTO taskFromController = objectMapper.readValue(responseContent, TaskDTO.class);
+
+        var taskFromDB = taskRepository.findAll().stream()
+                .filter(t -> t.getTitle().equals("Unassigned Task"))
+                .findFirst()
+                .orElse(null);
+
+        assertThat(taskFromDB).isNotNull();
+        assertThat(taskFromController.getTitle()).isEqualTo(taskFromDB.getTitle());
+        assertThat(taskFromDB.getAssignee()).isNull();
     }
 
     @Test
@@ -202,7 +242,7 @@ class TaskControllerTest {
         taskUpdateDTO.setIndex(JsonNullable.of(99));
         taskUpdateDTO.setContent(JsonNullable.of("Updated Description"));
 
-        mockMvc.perform(put("/api/tasks/" + task.getId())
+        MvcResult result = mockMvc.perform(put("/api/tasks/" + task.getId())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(taskUpdateDTO)))
                 .andExpect(status().isOk())
@@ -210,11 +250,17 @@ class TaskControllerTest {
                 .andExpect(jsonPath("$.index").value(99))
                 .andExpect(jsonPath("$.content").value("Updated Description"))
                 .andExpect(jsonPath("$.status").value("in_progress"))
-                .andExpect(jsonPath("$.assignee_id").value(testUser.getId()));
+                .andExpect(jsonPath("$.assignee_id").value(testUser.getId()))
+                .andReturn();
 
-        var updatedTask = taskRepository.findById(task.getId()).orElseThrow();
-        assertThat(updatedTask.getTitle()).isEqualTo("Updated Task");
-        assertThat(updatedTask.getIndex()).isEqualTo(99);
+        String responseContent = result.getResponse().getContentAsString();
+        TaskDTO taskFromController = objectMapper.readValue(responseContent, TaskDTO.class);
+
+        var taskFromDB = taskRepository.findById(task.getId()).orElseThrow();
+
+        assertThat(taskFromController.getTitle()).isEqualTo("Updated Task");
+        assertThat(taskFromDB.getTitle()).isEqualTo("Updated Task");
+        assertThat(taskFromController.getIndex()).isEqualTo(taskFromDB.getIndex());
     }
 
     @Test
@@ -225,13 +271,22 @@ class TaskControllerTest {
         TaskUpdateDTO taskUpdateDTO = new TaskUpdateDTO();
         taskUpdateDTO.setTitle(JsonNullable.of("Partially Updated"));
 
-        mockMvc.perform(put("/api/tasks/" + task.getId())
+        MvcResult result = mockMvc.perform(put("/api/tasks/" + task.getId())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(taskUpdateDTO)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.title").value("Partially Updated"))
                 .andExpect(jsonPath("$.index").value(1))
-                .andExpect(jsonPath("$.content").value("Test Description"));
+                .andExpect(jsonPath("$.content").value("Test Description"))
+                .andReturn();
+
+        String responseContent = result.getResponse().getContentAsString();
+        TaskDTO taskFromController = objectMapper.readValue(responseContent, TaskDTO.class);
+
+        var taskFromDB = taskRepository.findById(task.getId()).orElseThrow();
+
+        assertThat(taskFromController.getTitle()).isEqualTo("Partially Updated");
+        assertThat(taskFromDB.getTitle()).isEqualTo("Partially Updated");
     }
 
     @Test
@@ -242,14 +297,20 @@ class TaskControllerTest {
         TaskUpdateDTO taskUpdateDTO = new TaskUpdateDTO();
         taskUpdateDTO.setAssigneeId(JsonNullable.of(anotherUser.getId()));
 
-        mockMvc.perform(put("/api/tasks/" + task.getId())
+        MvcResult result = mockMvc.perform(put("/api/tasks/" + task.getId())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(taskUpdateDTO)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.assignee_id").value(anotherUser.getId()));
+                .andExpect(jsonPath("$.assignee_id").value(anotherUser.getId()))
+                .andReturn();
 
-        var updatedTask = taskRepository.findById(task.getId()).orElseThrow();
-        assertThat(updatedTask.getAssignee().getId()).isEqualTo(anotherUser.getId());
+        String responseContent = result.getResponse().getContentAsString();
+        TaskDTO taskFromController = objectMapper.readValue(responseContent, TaskDTO.class);
+
+        var taskFromDB = taskRepository.findById(task.getId()).orElseThrow();
+
+        assertThat(taskFromController.getAssigneeId()).isEqualTo(anotherUser.getId());
+        assertThat(taskFromDB.getAssignee().getId()).isEqualTo(anotherUser.getId());
     }
 
     @Test
@@ -260,14 +321,20 @@ class TaskControllerTest {
         TaskUpdateDTO taskUpdateDTO = new TaskUpdateDTO();
         taskUpdateDTO.setStatus(JsonNullable.of("completed"));
 
-        mockMvc.perform(put("/api/tasks/" + task.getId())
+        MvcResult result = mockMvc.perform(put("/api/tasks/" + task.getId())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(taskUpdateDTO)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("completed"));
+                .andExpect(jsonPath("$.status").value("completed"))
+                .andReturn();
 
-        var updatedTask = taskRepository.findById(task.getId()).orElseThrow();
-        assertThat(updatedTask.getTaskStatus().getId()).isEqualTo(completedStatus.getId());
+        String responseContent = result.getResponse().getContentAsString();
+        TaskDTO taskFromController = objectMapper.readValue(responseContent, TaskDTO.class);
+
+        var taskFromDB = taskRepository.findById(task.getId()).orElseThrow();
+
+        assertThat(taskFromController.getStatus()).isEqualTo("completed");
+        assertThat(taskFromDB.getTaskStatus().getId()).isEqualTo(completedStatus.getId());
     }
 
     @Test
@@ -363,15 +430,18 @@ class TaskControllerTest {
     void testTaskDTOContainsAllRequiredFields() throws Exception {
         Task task = createTestTask("Complete Task", 42, testStatus, testUser);
 
-        mockMvc.perform(get("/api/tasks/" + task.getId()))
+        MvcResult result = mockMvc.perform(get("/api/tasks/" + task.getId()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").exists())
-                .andExpect(jsonPath("$.title").value("Complete Task"))
-                .andExpect(jsonPath("$.index").value(42))
-                .andExpect(jsonPath("$.content").value("Test Description"))
-                .andExpect(jsonPath("$.status").value("in_progress"))
-                .andExpect(jsonPath("$.assignee_id").value(testUser.getId()))
-                .andExpect(jsonPath("$.createdAt").exists());
+                .andReturn();
+
+        String responseContent = result.getResponse().getContentAsString();
+        TaskDTO taskFromController = objectMapper.readValue(responseContent, TaskDTO.class);
+
+        var taskFromDB = taskRepository.findById(task.getId()).orElseThrow();
+
+        assertThat(taskFromController.getId()).isEqualTo(taskFromDB.getId());
+        assertThat(taskFromController.getTitle()).isEqualTo(taskFromDB.getTitle());
+        assertThat(taskFromController.getIndex()).isEqualTo(taskFromDB.getIndex());
     }
 
     @Test

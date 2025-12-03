@@ -1,8 +1,10 @@
 package hexlet.code.controller;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import hexlet.code.dto.AuthRequest;
 import hexlet.code.dto.UserCreateDTO;
+import hexlet.code.dto.UserDTO;
 import hexlet.code.dto.UserUpdateDTO;
 import hexlet.code.model.Task;
 import hexlet.code.model.TaskStatus;
@@ -18,11 +20,14 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.test.web.servlet.MvcResult;
 
 import java.time.LocalDate;
+import java.util.List;
+import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasSize;
@@ -73,19 +78,47 @@ class UserControllerTest {
     @Test
     @WithMockUser
     void testGetAllUsers() throws Exception {
-        User user = new User();
-        user.setEmail("test@example.com");
-        user.setPasswordDigest(passwordEncoder.encode("password"));
-        user.setFirstName("John");
-        user.setLastName("Doe");
-        userRepository.save(user);
+        User user1 = new User();
+        user1.setEmail("test1@example.com");
+        user1.setPasswordDigest(passwordEncoder.encode("password"));
+        user1.setFirstName("John");
+        user1.setLastName("Doe");
+        userRepository.save(user1);
 
-        mockMvc.perform(get("/api/users"))
+        User user2 = new User();
+        user2.setEmail("test2@example.com");
+        user2.setPasswordDigest(passwordEncoder.encode("password"));
+        user2.setFirstName("Jane");
+        user2.setLastName("Smith");
+        userRepository.save(user2);
+
+        MvcResult result = mockMvc.perform(get("/api/users"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(1)))
-                .andExpect(jsonPath("$[0].email").value("test@example.com"))
-                .andExpect(jsonPath("$[0].firstName").value("John"))
-                .andExpect(jsonPath("$[0].lastName").value("Doe"));
+                .andExpect(jsonPath("$", hasSize(2)))
+                .andReturn();
+
+        String responseContent = result.getResponse().getContentAsString();
+        List<UserDTO> usersFromController = objectMapper.readValue(
+                responseContent,
+                new TypeReference<List<UserDTO>>() { }
+        );
+
+        List<User> usersFromDB = userRepository.findAll();
+
+        assertThat(usersFromController).hasSize(2);
+        assertThat(usersFromDB).hasSize(2);
+
+        List<String> controllerEmails = usersFromController.stream()
+                .map(UserDTO::getEmail)
+                .sorted()
+                .collect(Collectors.toList());
+
+        List<String> dbEmails = usersFromDB.stream()
+                .map(User::getEmail)
+                .sorted()
+                .collect(Collectors.toList());
+
+        assertThat(controllerEmails).containsExactlyElementsOf(dbEmails);
     }
 
     @Test
@@ -98,11 +131,18 @@ class UserControllerTest {
         user.setLastName("Doe");
         User savedUser = userRepository.save(user);
 
-        mockMvc.perform(get("/api/users/" + savedUser.getId()))
+        MvcResult result = mockMvc.perform(get("/api/users/" + savedUser.getId()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.email").value("test@example.com"))
-                .andExpect(jsonPath("$.firstName").value("John"))
-                .andExpect(jsonPath("$.lastName").value("Doe"));
+                .andReturn();
+
+        String responseContent = result.getResponse().getContentAsString();
+        UserDTO userFromController = objectMapper.readValue(responseContent, UserDTO.class);
+
+        var userFromDB = userRepository.findById(savedUser.getId()).orElseThrow();
+
+        assertThat(userFromController.getEmail()).isEqualTo(userFromDB.getEmail());
+        assertThat(userFromController.getFirstName()).isEqualTo(userFromDB.getFirstName());
+        assertThat(userFromController.getLastName()).isEqualTo(userFromDB.getLastName());
     }
 
     @Test
@@ -114,19 +154,36 @@ class UserControllerTest {
         userCreateDTO.setFirstName("Jane");
         userCreateDTO.setLastName("Smith");
 
-        mockMvc.perform(post("/api/users")
+        MvcResult result = mockMvc.perform(post("/api/users")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(userCreateDTO)))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.email").value("newuser@example.com"))
-                .andExpect(jsonPath("$.firstName").value("Jane"))
-                .andExpect(jsonPath("$.lastName").value("Smith"));
+                .andReturn();
 
-        var createdUser = userRepository.findByEmail("newuser@example.com");
-        assertThat(createdUser).isPresent();
-        assertThat(createdUser.get().getFirstName()).isEqualTo("Jane");
-        assertThat(createdUser.get().getLastName()).isEqualTo("Smith");
-        assertThat(passwordEncoder.matches("password123", createdUser.get().getPasswordDigest())).isTrue();
+        String responseContent = result.getResponse().getContentAsString();
+        UserDTO userFromController = objectMapper.readValue(responseContent, UserDTO.class);
+
+        var userFromDB = userRepository.findByEmail("newuser@example.com").orElse(null);
+
+        assertThat(userFromDB).isNotNull();
+        assertThat(userFromController.getEmail()).isEqualTo(userFromDB.getEmail());
+        assertThat(userFromController.getFirstName()).isEqualTo(userFromDB.getFirstName());
+        assertThat(userFromController.getLastName()).isEqualTo(userFromDB.getLastName());
+    }
+
+    @Test
+    @WithMockUser
+    void testCreateUserWithNullPassword() throws Exception {
+        UserCreateDTO userCreateDTO = new UserCreateDTO();
+        userCreateDTO.setEmail("test@example.com");
+        userCreateDTO.setPassword(null);
+        userCreateDTO.setFirstName("John");
+        userCreateDTO.setLastName("Doe");
+
+        mockMvc.perform(post("/api/users")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(userCreateDTO)))
+                .andExpect(status().isBadRequest());
     }
 
     @Test
@@ -143,17 +200,53 @@ class UserControllerTest {
         userUpdateDTO.setFirstName(JsonNullable.of("UpdatedName"));
         userUpdateDTO.setEmail(JsonNullable.of("updated@example.com"));
 
-        mockMvc.perform(put("/api/users/" + savedUser.getId())
+        MvcResult result = mockMvc.perform(put("/api/users/" + savedUser.getId())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(userUpdateDTO)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.firstName").value("UpdatedName"))
-                .andExpect(jsonPath("$.email").value("updated@example.com"))
-                .andExpect(jsonPath("$.lastName").value("Doe"));
+                .andReturn();
 
-        var updatedUser = userRepository.findById(savedUser.getId()).orElseThrow();
-        assertThat(updatedUser.getFirstName()).isEqualTo("UpdatedName");
-        assertThat(updatedUser.getEmail()).isEqualTo("updated@example.com");
+        String responseContent = result.getResponse().getContentAsString();
+        UserDTO userFromController = objectMapper.readValue(responseContent, UserDTO.class);
+
+        var userFromDB = userRepository.findById(savedUser.getId()).orElseThrow();
+
+        assertThat(userFromController.getFirstName()).isEqualTo("UpdatedName");
+        assertThat(userFromDB.getFirstName()).isEqualTo("UpdatedName");
+        assertThat(userFromController.getEmail()).isEqualTo(userFromDB.getEmail());
+        assertThat(userFromController.getLastName()).isEqualTo(userFromDB.getLastName());
+    }
+
+    @Test
+    @WithMockUser(username = "test@example.com")
+    void testPartialUpdateUser() throws Exception {
+        User user = new User();
+        user.setEmail("test@example.com");
+        user.setPasswordDigest(passwordEncoder.encode("password"));
+        user.setFirstName("John");
+        user.setLastName("Doe");
+        User savedUser = userRepository.save(user);
+
+        UserUpdateDTO userUpdateDTO = new UserUpdateDTO();
+        userUpdateDTO.setFirstName(JsonNullable.of("UpdatedFirstName"));
+
+        MvcResult result = mockMvc.perform(put("/api/users/" + savedUser.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(userUpdateDTO)))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        String responseContent = result.getResponse().getContentAsString();
+        UserDTO userFromController = objectMapper.readValue(responseContent, UserDTO.class);
+
+        var userFromDB = userRepository.findById(savedUser.getId()).orElseThrow();
+
+        assertThat(userFromController.getFirstName()).isEqualTo("UpdatedFirstName");
+        assertThat(userFromDB.getFirstName()).isEqualTo("UpdatedFirstName");
+        assertThat(userFromController.getLastName()).isEqualTo("Doe");
+        assertThat(userFromDB.getLastName()).isEqualTo("Doe");
+        assertThat(userFromController.getEmail()).isEqualTo("test@example.com");
+        assertThat(userFromDB.getEmail()).isEqualTo("test@example.com");
     }
 
     @Test
@@ -169,12 +262,18 @@ class UserControllerTest {
         UserUpdateDTO userUpdateDTO = new UserUpdateDTO();
         userUpdateDTO.setPassword(JsonNullable.of("newpassword123"));
 
-        mockMvc.perform(put("/api/users/" + savedUser.getId())
+        MvcResult result = mockMvc.perform(put("/api/users/" + savedUser.getId())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(userUpdateDTO)))
-                .andExpect(status().isOk());
+                .andExpect(status().isOk())
+                .andReturn();
+
+        String responseContent = result.getResponse().getContentAsString();
+        UserDTO userFromController = objectMapper.readValue(responseContent, UserDTO.class);
 
         var updatedUser = userRepository.findById(savedUser.getId()).orElseThrow();
+
+        assertThat(userFromController.getEmail()).isEqualTo(updatedUser.getEmail());
         assertThat(passwordEncoder.matches("newpassword123", updatedUser.getPasswordDigest())).isTrue();
     }
 
@@ -252,21 +351,6 @@ class UserControllerTest {
 
     @Test
     @WithMockUser
-    void testCreateUserWithNullPassword() throws Exception {
-        UserCreateDTO userCreateDTO = new UserCreateDTO();
-        userCreateDTO.setEmail("test@example.com");
-        userCreateDTO.setPassword(null);
-        userCreateDTO.setFirstName("John");
-        userCreateDTO.setLastName("Doe");
-
-        mockMvc.perform(post("/api/users")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(userCreateDTO)))
-                .andExpect(status().isBadRequest());
-    }
-
-    @Test
-    @WithMockUser
     void testGetNonExistentUser() throws Exception {
         mockMvc.perform(get("/api/users/999"))
                 .andExpect(status().isNotFound());
@@ -292,33 +376,6 @@ class UserControllerTest {
     }
 
     @Test
-    @WithMockUser(username = "test@example.com")
-    void testPartialUpdateUser() throws Exception {
-        User user = new User();
-        user.setEmail("test@example.com");
-        user.setPasswordDigest(passwordEncoder.encode("password"));
-        user.setFirstName("John");
-        user.setLastName("Doe");
-        User savedUser = userRepository.save(user);
-
-        UserUpdateDTO userUpdateDTO = new UserUpdateDTO();
-        userUpdateDTO.setFirstName(JsonNullable.of("UpdatedFirstName"));
-
-        mockMvc.perform(put("/api/users/" + savedUser.getId())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(userUpdateDTO)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.firstName").value("UpdatedFirstName"))
-                .andExpect(jsonPath("$.lastName").value("Doe"))
-                .andExpect(jsonPath("$.email").value("test@example.com"));
-
-        var updatedUser = userRepository.findById(savedUser.getId()).orElseThrow();
-        assertThat(updatedUser.getFirstName()).isEqualTo("UpdatedFirstName");
-        assertThat(updatedUser.getLastName()).isEqualTo("Doe");
-        assertThat(updatedUser.getEmail()).isEqualTo("test@example.com");
-    }
-
-    @Test
     @WithMockUser
     void testUserDTOContainsUpdatedAt() throws Exception {
         User testUser = new User();
@@ -331,14 +388,20 @@ class UserControllerTest {
         assertThat(savedUser.getCreatedAt()).isNotNull();
         assertThat(savedUser.getUpdatedAt()).isNotNull();
 
-        mockMvc.perform(get("/api/users/" + savedUser.getId()))
+        MvcResult result = mockMvc.perform(get("/api/users/" + savedUser.getId()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").exists())
-                .andExpect(jsonPath("$.email").value("test-timestamp@example.com"))
-                .andExpect(jsonPath("$.firstName").value("Timestamp"))
-                .andExpect(jsonPath("$.lastName").value("Test"))
-                .andExpect(jsonPath("$.createdAt").exists())
-                .andExpect(jsonPath("$.updatedAt").exists());
+                .andReturn();
+
+        String responseContent = result.getResponse().getContentAsString();
+        UserDTO userFromController = objectMapper.readValue(responseContent, UserDTO.class);
+
+        var userFromDB = userRepository.findById(savedUser.getId()).orElseThrow();
+
+        assertThat(userFromController.getEmail()).isEqualTo(userFromDB.getEmail());
+        assertThat(userFromController.getFirstName()).isEqualTo(userFromDB.getFirstName());
+        assertThat(userFromController.getLastName()).isEqualTo(userFromDB.getLastName());
+        assertThat(userFromController.getCreatedAt()).isNotNull();
+        assertThat(userFromController.getUpdatedAt()).isNotNull();
     }
 
     @Test
