@@ -25,7 +25,6 @@ import org.springframework.test.web.servlet.MvcResult;
 
 import java.time.LocalDate;
 import java.util.List;
-import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasSize;
@@ -100,12 +99,12 @@ class LabelControllerTest {
         List<String> controllerLabelNames = labelsFromController.stream()
                 .map(LabelDTO::getName)
                 .sorted()
-                .collect(Collectors.toList());
+                .toList();
 
         List<String> dbLabelNames = labelsFromDB.stream()
                 .map(Label::getName)
                 .sorted()
-                .collect(Collectors.toList());
+                .toList();
 
         assertThat(controllerLabelNames).containsExactlyElementsOf(dbLabelNames);
     }
