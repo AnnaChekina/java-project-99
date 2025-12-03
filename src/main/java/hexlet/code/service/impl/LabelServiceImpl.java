@@ -8,7 +8,6 @@ import hexlet.code.mapper.LabelMapper;
 import hexlet.code.model.Label;
 import hexlet.code.repository.LabelRepository;
 import hexlet.code.service.LabelService;
-import hexlet.code.service.TaskService;
 import lombok.AllArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
@@ -21,7 +20,6 @@ public class LabelServiceImpl implements LabelService {
 
     private final LabelRepository labelRepository;
     private final LabelMapper labelMapper;
-    private final TaskService taskService;
 
     @Override
     public List<LabelDTO> getAll() {
@@ -68,10 +66,6 @@ public class LabelServiceImpl implements LabelService {
     public void delete(Long id) {
         Label label = labelRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Label Not Found: " + id));
-
-        if (taskService.existsByLabelId(id)) {
-            throw new DataIntegrityViolationException("Cannot delete label: label is used in tasks");
-        }
 
         labelRepository.delete(label);
     }

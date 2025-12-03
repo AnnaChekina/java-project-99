@@ -4,7 +4,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import hexlet.code.dto.AuthRequest;
 import hexlet.code.dto.UserCreateDTO;
 import hexlet.code.dto.UserUpdateDTO;
+import hexlet.code.model.Task;
+import hexlet.code.model.TaskStatus;
 import hexlet.code.model.User;
+import hexlet.code.repository.TaskRepository;
+import hexlet.code.repository.TaskStatusRepository;
 import hexlet.code.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -17,6 +21,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.security.test.context.support.WithMockUser;
+
+import java.time.LocalDate;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasSize;
@@ -42,11 +48,26 @@ class UserControllerTest {
     private UserRepository userRepository;
 
     @Autowired
+    private TaskRepository taskRepository;
+
+    @Autowired
+    private TaskStatusRepository taskStatusRepository;
+
+    @Autowired
     private PasswordEncoder passwordEncoder;
+
+    private TaskStatus testStatus;
 
     @BeforeEach
     void setUp() {
+        taskRepository.deleteAll();
         userRepository.deleteAll();
+        taskStatusRepository.deleteAll();
+
+        testStatus = new TaskStatus();
+        testStatus.setName("Test Status");
+        testStatus.setSlug("test_status");
+        taskStatusRepository.save(testStatus);
     }
 
     @Test
@@ -171,6 +192,27 @@ class UserControllerTest {
                 .andExpect(status().isNoContent());
 
         assertThat(userRepository.findById(savedUser.getId())).isEmpty();
+    }
+
+    @Test
+    @WithMockUser(username = "test@example.com")
+    void testDeleteUserWithAssignedTasks() throws Exception {
+        User user = new User();
+        user.setEmail("test@example.com");
+        user.setPasswordDigest(passwordEncoder.encode("password"));
+        user.setFirstName("John");
+        user.setLastName("Doe");
+        User savedUser = userRepository.save(user);
+
+        Task task = new Task();
+        task.setTitle("Assigned Task");
+        task.setAssignee(savedUser);
+        task.setTaskStatus(testStatus);
+        task.setCreatedAt(LocalDate.now());
+        taskRepository.save(task);
+
+        mockMvc.perform(delete("/api/users/" + savedUser.getId()))
+                .andExpect(status().isConflict());
     }
 
     @Test

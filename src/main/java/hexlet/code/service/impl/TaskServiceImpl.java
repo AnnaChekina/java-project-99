@@ -79,19 +79,4 @@ public class TaskServiceImpl implements TaskService {
                 .orElseThrow(() -> new ResourceNotFoundException("Task Not Found: " + id));
         taskRepository.delete(task);
     }
-
-    @Override
-    public boolean existsByAssigneeId(Long assigneeId) {
-        return taskRepository.existsByAssigneeId(assigneeId);
-    }
-
-    @Override
-    public boolean existsByTaskStatusId(Long taskStatusId) {
-        return taskRepository.existsByTaskStatusId(taskStatusId);
-    }
-
-    @Override
-    public boolean existsByLabelId(Long labelId) {
-        return taskRepository.existsByLabelId(labelId);
-    }
 }

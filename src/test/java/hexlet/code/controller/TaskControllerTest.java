@@ -273,7 +273,18 @@ class TaskControllerTest {
     @Test
     @WithMockUser
     void testDeleteTask() throws Exception {
-        Task task = createTestTask("Task to Delete", 1, testStatus, testUser);
+        Task task = createTestTask("Task to Delete", 1, testStatus, null);
+
+        mockMvc.perform(delete("/api/tasks/" + task.getId()))
+                .andExpect(status().isNoContent());
+
+        assertThat(taskRepository.findById(task.getId())).isEmpty();
+    }
+
+    @Test
+    @WithMockUser
+    void testDeleteTaskWithAssignee() throws Exception {
+        Task task = createTestTask("Task with Assignee", 1, testStatus, testUser);
 
         mockMvc.perform(delete("/api/tasks/" + task.getId()))
                 .andExpect(status().isNoContent());

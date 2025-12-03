@@ -3,7 +3,9 @@ package hexlet.code.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import hexlet.code.dto.TaskStatusCreateDTO;
 import hexlet.code.dto.TaskStatusUpdateDTO;
+import hexlet.code.model.Task;
 import hexlet.code.model.TaskStatus;
+import hexlet.code.repository.TaskRepository;
 import hexlet.code.repository.TaskStatusRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -15,6 +17,8 @@ import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
+
+import java.time.LocalDate;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasSize;
@@ -39,8 +43,12 @@ class TaskStatusControllerTest {
     @Autowired
     private TaskStatusRepository taskStatusRepository;
 
+    @Autowired
+    private TaskRepository taskRepository;
+
     @BeforeEach
     void setUp() {
+        taskRepository.deleteAll();
         taskStatusRepository.deleteAll();
     }
 
@@ -164,6 +172,24 @@ class TaskStatusControllerTest {
 
     @Test
     @WithMockUser
+    void testDeleteTaskStatusUsedInTask() throws Exception {
+        TaskStatus taskStatus = new TaskStatus();
+        taskStatus.setName("In Progress");
+        taskStatus.setSlug("in_progress");
+        TaskStatus savedStatus = taskStatusRepository.save(taskStatus);
+
+        Task task = new Task();
+        task.setTitle("Test Task");
+        task.setTaskStatus(savedStatus);
+        task.setCreatedAt(LocalDate.now());
+        taskRepository.save(task);
+
+        mockMvc.perform(delete("/api/task_statuses/" + savedStatus.getId()))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
+    @WithMockUser
     void testCreateTaskStatusWithInvalidData() throws Exception {
         TaskStatusCreateDTO taskStatusCreateDTO = new TaskStatusCreateDTO();
         taskStatusCreateDTO.setName(""); // Пустое имя
@@ -257,7 +283,6 @@ class TaskStatusControllerTest {
 
     @Test
     void testAccessWithoutAuthentication() throws Exception {
-        // Попытка доступа без аутентификации должна вернуть 401
         mockMvc.perform(get("/api/task_statuses"))
                 .andExpect(status().isUnauthorized());
 

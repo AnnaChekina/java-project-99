@@ -8,7 +8,6 @@ import hexlet.code.mapper.UserMapper;
 import hexlet.code.model.User;
 import hexlet.code.repository.UserRepository;
 import hexlet.code.service.CustomUserDetailsService;
-import hexlet.code.service.TaskService;
 import hexlet.code.service.UserService;
 import lombok.AllArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -23,7 +22,6 @@ public class UserServiceImpl implements UserService {
     private final UserRepository userRepository;
     private final UserMapper userMapper;
     private final CustomUserDetailsService userDetailsService;
-    private final TaskService taskService;
 
     @Override
     public List<UserDTO> getAll() {
@@ -62,7 +60,7 @@ public class UserServiceImpl implements UserService {
 
         if (userData.getPassword() != null && userData.getPassword().isPresent()) {
             String rawPassword = userData.getPassword().get();
-            user.setPasswordDigest(rawPassword); // Устанавливаем raw password
+            user.setPasswordDigest(rawPassword);
         }
 
         userDetailsService.updateUser(user);
@@ -73,10 +71,6 @@ public class UserServiceImpl implements UserService {
     public void delete(Long id) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User Not Found: " + id));
-
-        if (taskService.existsByAssigneeId(id)) {
-            throw new DataIntegrityViolationException("Cannot delete user: user has assigned tasks");
-        }
 
         userDetailsService.deleteUser(user.getEmail());
     }

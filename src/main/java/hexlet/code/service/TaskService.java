@@ -16,7 +16,4 @@ public interface TaskService {
     TaskDTO create(TaskCreateDTO taskData);
     TaskDTO update(TaskUpdateDTO taskData, Long id);
     void delete(Long id);
-    boolean existsByAssigneeId(Long assigneeId);
-    boolean existsByTaskStatusId(Long taskStatusId);
-    boolean existsByLabelId(Long labelId);
 }

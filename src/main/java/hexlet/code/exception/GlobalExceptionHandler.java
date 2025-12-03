@@ -16,14 +16,12 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<String> handleDataIntegrityViolation(DataIntegrityViolationException ex) {
-        // Возвращаем 409 Conflict для дубликатов email
         return ResponseEntity.status(HttpStatus.CONFLICT)
-                .body("Email already exists");
+                .body("Data integrity violation");
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<String> handleIllegalArgument(IllegalArgumentException ex) {
-        // Возвращаем 400 Bad Request для невалидных аргументов
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(ex.getMessage());
     }
