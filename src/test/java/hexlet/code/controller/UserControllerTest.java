@@ -364,14 +364,14 @@ class UserControllerTest {
         mockMvc.perform(put("/api/users/999")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(userUpdateDTO)))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isForbidden());
     }
 
     @Test
     @WithMockUser(username = "nonexistent@example.com")
     void testDeleteNonExistentUser() throws Exception {
         mockMvc.perform(delete("/api/users/999"))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isForbidden());
     }
 
     @Test

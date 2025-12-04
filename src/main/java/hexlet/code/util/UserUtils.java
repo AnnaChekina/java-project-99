@@ -25,4 +25,15 @@ public class UserUtils {
         var authentication = SecurityContextHolder.getContext().getAuthentication();
         return authentication != null ? authentication.getName() : null;
     }
+
+    public boolean isProfileOwner(Long userId) {
+        var authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return false;
+        }
+
+        return userRepository.findById(userId)
+                .map(user -> authentication.getName().equals(user.getEmail()))
+                .orElse(false);
+    }
 }
