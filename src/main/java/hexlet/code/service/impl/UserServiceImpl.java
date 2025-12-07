@@ -10,7 +10,6 @@ import hexlet.code.repository.UserRepository;
 import hexlet.code.service.CustomUserDetailsService;
 import hexlet.code.service.UserService;
 import lombok.AllArgsConstructor;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -43,12 +42,8 @@ public class UserServiceImpl implements UserService {
         User user = userMapper.map(userData);
         user.setPasswordDigest(userData.getPassword());
 
-        try {
-            userDetailsService.createUser(user);
-            return userMapper.map(user);
-        } catch (DataIntegrityViolationException e) {
-            throw new DataIntegrityViolationException("Email already exists");
-        }
+        userDetailsService.createUser(user);
+        return userMapper.map(user);
     }
 
     @Override

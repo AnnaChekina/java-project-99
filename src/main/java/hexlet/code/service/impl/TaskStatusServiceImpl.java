@@ -10,7 +10,6 @@ import hexlet.code.model.TaskStatus;
 import hexlet.code.repository.TaskStatusRepository;
 import hexlet.code.service.TaskStatusService;
 import lombok.AllArgsConstructor;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -40,13 +39,8 @@ public class TaskStatusServiceImpl implements TaskStatusService {
     @Override
     public TaskStatusDTO create(TaskStatusCreateDTO taskStatusData) {
         TaskStatus taskStatus = taskStatusMapper.map(taskStatusData);
-
-        try {
-            taskStatusRepository.save(taskStatus);
-            return taskStatusMapper.map(taskStatus);
-        } catch (DataIntegrityViolationException e) {
-            throw new DataIntegrityViolationException("TaskStatus with this name or slug already exists");
-        }
+        taskStatusRepository.save(taskStatus);
+        return taskStatusMapper.map(taskStatus);
     }
 
     @Override
@@ -55,13 +49,8 @@ public class TaskStatusServiceImpl implements TaskStatusService {
                 .orElseThrow(() -> new ResourceNotFoundException("TaskStatus Not Found: " + id));
 
         taskStatusMapper.update(taskStatusData, taskStatus);
-
-        try {
-            taskStatusRepository.save(taskStatus);
-            return taskStatusMapper.map(taskStatus);
-        } catch (DataIntegrityViolationException e) {
-            throw new DataIntegrityViolationException("TaskStatus with this name or slug already exists");
-        }
+        taskStatusRepository.save(taskStatus);
+        return taskStatusMapper.map(taskStatus);
     }
 
     @Override

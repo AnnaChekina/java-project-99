@@ -11,7 +11,6 @@ import hexlet.code.repository.TaskRepository;
 import hexlet.code.service.TaskService;
 import hexlet.code.specification.TaskSpecification;
 import lombok.AllArgsConstructor;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -52,12 +51,8 @@ public class TaskServiceImpl implements TaskService {
     @Override
     public TaskDTO create(TaskCreateDTO taskData) {
         Task task = taskMapper.map(taskData);
-        try {
-            taskRepository.save(task);
-            return taskMapper.map(task);
-        } catch (DataIntegrityViolationException e) {
-            throw new DataIntegrityViolationException("Task creation failed due to data integrity violation");
-        }
+        taskRepository.save(task);
+        return taskMapper.map(task);
     }
 
     @Override
@@ -65,12 +60,8 @@ public class TaskServiceImpl implements TaskService {
         Task task = taskRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Task Not Found: " + id));
         taskMapper.update(taskData, task);
-        try {
-            taskRepository.save(task);
-            return taskMapper.map(task);
-        } catch (DataIntegrityViolationException e) {
-            throw new DataIntegrityViolationException("Task update failed due to data integrity violation");
-        }
+        taskRepository.save(task);
+        return taskMapper.map(task);
     }
 
     @Override

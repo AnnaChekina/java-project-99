@@ -9,7 +9,6 @@ import hexlet.code.model.Label;
 import hexlet.code.repository.LabelRepository;
 import hexlet.code.service.LabelService;
 import lombok.AllArgsConstructor;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -39,12 +38,8 @@ public class LabelServiceImpl implements LabelService {
     @Override
     public LabelDTO create(LabelCreateDTO labelData) {
         Label label = labelMapper.map(labelData);
-        try {
-            labelRepository.save(label);
-            return labelMapper.map(label);
-        } catch (DataIntegrityViolationException e) {
-            throw new DataIntegrityViolationException("Label with this name already exists");
-        }
+        labelRepository.save(label);
+        return labelMapper.map(label);
     }
 
     @Override
@@ -53,13 +48,8 @@ public class LabelServiceImpl implements LabelService {
                 .orElseThrow(() -> new ResourceNotFoundException("Label Not Found: " + id));
 
         labelMapper.update(labelData, label);
-
-        try {
-            labelRepository.save(label);
-            return labelMapper.map(label);
-        } catch (DataIntegrityViolationException e) {
-            throw new DataIntegrityViolationException("Label with this name already exists");
-        }
+        labelRepository.save(label);
+        return labelMapper.map(label);
     }
 
     @Override
