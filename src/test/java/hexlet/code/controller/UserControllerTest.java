@@ -27,6 +27,7 @@ import org.springframework.test.web.servlet.MvcResult;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Comparator;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasSize;
@@ -107,17 +108,28 @@ class UserControllerTest {
         assertThat(usersFromController).hasSize(2);
         assertThat(usersFromDB).hasSize(2);
 
-        List<String> controllerEmails = usersFromController.stream()
-                .map(UserDTO::getEmail)
-                .sorted()
+        List<UserDTO> usersFromDBasDTO = usersFromDB.stream()
+                .map(user -> {
+                    UserDTO dto = new UserDTO();
+                    dto.setId(user.getId());
+                    dto.setEmail(user.getEmail());
+                    dto.setFirstName(user.getFirstName());
+                    dto.setLastName(user.getLastName());
+                    dto.setCreatedAt(user.getCreatedAt());
+                    dto.setUpdatedAt(user.getUpdatedAt());
+                    return dto;
+                })
+                .sorted(Comparator.comparing(UserDTO::getEmail))
                 .toList();
 
-        List<String> dbEmails = usersFromDB.stream()
-                .map(User::getEmail)
-                .sorted()
+        List<UserDTO> sortedUsersFromController = usersFromController.stream()
+                .sorted(Comparator.comparing(UserDTO::getEmail))
                 .toList();
 
-        assertThat(controllerEmails).containsExactlyElementsOf(dbEmails);
+        assertThat(sortedUsersFromController)
+                .usingRecursiveComparison()
+                .ignoringFields("id")
+                .isEqualTo(usersFromDBasDTO);
     }
 
     @Test
