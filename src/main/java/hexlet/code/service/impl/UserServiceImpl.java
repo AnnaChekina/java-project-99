@@ -53,8 +53,9 @@ public class UserServiceImpl implements UserService {
 
         userMapper.update(userData, user);
 
-        if (userData.getPassword() != null && userData.getPassword().isPresent()) {
-            String rawPassword = userData.getPassword().get();
+        String rawPassword = userData.getPassword().orElse(null);
+
+        if (rawPassword != null) {
             user.setPasswordDigest(rawPassword);
         }
 
