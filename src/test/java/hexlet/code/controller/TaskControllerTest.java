@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import hexlet.code.dto.TaskCreateDTO;
 import hexlet.code.dto.TaskDTO;
 import hexlet.code.dto.TaskUpdateDTO;
+import hexlet.code.mapper.TaskMapper;
 import hexlet.code.model.Label;
 import hexlet.code.model.Task;
 import hexlet.code.model.TaskStatus;
@@ -25,8 +26,10 @@ import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalDate;
+import java.util.Comparator;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -63,6 +66,12 @@ class TaskControllerTest {
 
     @Autowired
     private PasswordEncoder passwordEncoder;
+
+    @Autowired
+    private TaskMapper taskMapper;
+
+    @Autowired
+    private TransactionTemplate transactionTemplate;
 
     private Label bugLabel;
     private Label featureLabel;
@@ -136,22 +145,24 @@ class TaskControllerTest {
                 new TypeReference<List<TaskDTO>>() { }
         );
 
-        List<Task> tasksFromDB = taskRepository.findAll();
+        List<TaskDTO> tasksFromDBasDTO = transactionTemplate.execute(status -> {
+            return taskRepository.findAll().stream()
+                    .map(taskMapper::map)
+                    .sorted(Comparator.comparing(TaskDTO::getTitle))
+                    .toList();
+        });
 
         assertThat(tasksFromController).hasSize(2);
-        assertThat(tasksFromDB).hasSize(2);
+        assertThat(tasksFromDBasDTO).hasSize(2);
 
-        List<String> controllerTitles = tasksFromController.stream()
-                .map(TaskDTO::getTitle)
-                .sorted()
+        List<TaskDTO> sortedTasksFromController = tasksFromController.stream()
+                .sorted(Comparator.comparing(TaskDTO::getTitle))
                 .toList();
 
-        List<String> dbTitles = tasksFromDB.stream()
-                .map(Task::getTitle)
-                .sorted()
-                .toList();
-
-        assertThat(controllerTitles).containsExactlyElementsOf(dbTitles);
+        assertThat(sortedTasksFromController)
+                .usingRecursiveComparison()
+                .ignoringFields("id", "createdAt")
+                .isEqualTo(tasksFromDBasDTO);
     }
 
     @Test

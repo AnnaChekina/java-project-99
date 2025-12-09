@@ -6,6 +6,7 @@ import hexlet.code.dto.AuthRequest;
 import hexlet.code.dto.UserCreateDTO;
 import hexlet.code.dto.UserDTO;
 import hexlet.code.dto.UserUpdateDTO;
+import hexlet.code.mapper.UserMapper;
 import hexlet.code.model.Task;
 import hexlet.code.model.TaskStatus;
 import hexlet.code.model.User;
@@ -61,6 +62,9 @@ class UserControllerTest {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
+    @Autowired
+    private UserMapper userMapper;
+
     private TaskStatus testStatus;
 
     @BeforeEach
@@ -83,6 +87,8 @@ class UserControllerTest {
         user1.setPasswordDigest(passwordEncoder.encode("password"));
         user1.setFirstName("John");
         user1.setLastName("Doe");
+        user1.setCreatedAt(LocalDate.now());
+        user1.setUpdatedAt(LocalDate.now());
         userRepository.save(user1);
 
         User user2 = new User();
@@ -90,6 +96,8 @@ class UserControllerTest {
         user2.setPasswordDigest(passwordEncoder.encode("password"));
         user2.setFirstName("Jane");
         user2.setLastName("Smith");
+        user2.setCreatedAt(LocalDate.now());
+        user2.setUpdatedAt(LocalDate.now());
         userRepository.save(user2);
 
         MvcResult result = mockMvc.perform(get("/api/users"))
@@ -109,16 +117,7 @@ class UserControllerTest {
         assertThat(usersFromDB).hasSize(2);
 
         List<UserDTO> usersFromDBasDTO = usersFromDB.stream()
-                .map(user -> {
-                    UserDTO dto = new UserDTO();
-                    dto.setId(user.getId());
-                    dto.setEmail(user.getEmail());
-                    dto.setFirstName(user.getFirstName());
-                    dto.setLastName(user.getLastName());
-                    dto.setCreatedAt(user.getCreatedAt());
-                    dto.setUpdatedAt(user.getUpdatedAt());
-                    return dto;
-                })
+                .map(userMapper::map)
                 .sorted(Comparator.comparing(UserDTO::getEmail))
                 .toList();
 

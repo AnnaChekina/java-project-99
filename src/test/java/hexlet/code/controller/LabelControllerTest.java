@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import hexlet.code.dto.LabelCreateDTO;
 import hexlet.code.dto.LabelDTO;
 import hexlet.code.dto.LabelUpdateDTO;
+import hexlet.code.mapper.LabelMapper;
 import hexlet.code.model.Label;
 import hexlet.code.model.Task;
 import hexlet.code.model.TaskStatus;
@@ -24,6 +25,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
 import java.time.LocalDate;
+import java.util.Comparator;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -55,6 +57,9 @@ class LabelControllerTest {
     @Autowired
     private TaskStatusRepository taskStatusRepository;
 
+    @Autowired
+    private LabelMapper labelMapper;
+
     private TaskStatus testStatus;
 
     @BeforeEach
@@ -74,10 +79,12 @@ class LabelControllerTest {
     void testGetAllLabels() throws Exception {
         Label label1 = new Label();
         label1.setName("bug");
+        label1.setCreatedAt(LocalDate.now());
         labelRepository.save(label1);
 
         Label label2 = new Label();
         label2.setName("feature");
+        label2.setCreatedAt(LocalDate.now());
         labelRepository.save(label2);
 
         MvcResult result = mockMvc.perform(get("/api/labels"))
@@ -96,17 +103,19 @@ class LabelControllerTest {
         assertThat(labelsFromController).hasSize(2);
         assertThat(labelsFromDB).hasSize(2);
 
-        List<String> controllerLabelNames = labelsFromController.stream()
-                .map(LabelDTO::getName)
-                .sorted()
+        List<LabelDTO> labelsFromDBasDTO = labelsFromDB.stream()
+                .map(labelMapper::map)
+                .sorted(Comparator.comparing(LabelDTO::getName))
                 .toList();
 
-        List<String> dbLabelNames = labelsFromDB.stream()
-                .map(Label::getName)
-                .sorted()
+        List<LabelDTO> sortedLabelsFromController = labelsFromController.stream()
+                .sorted(Comparator.comparing(LabelDTO::getName))
                 .toList();
 
-        assertThat(controllerLabelNames).containsExactlyElementsOf(dbLabelNames);
+        assertThat(sortedLabelsFromController)
+                .usingRecursiveComparison()
+                .ignoringFields("id")
+                .isEqualTo(labelsFromDBasDTO);
     }
 
     @Test

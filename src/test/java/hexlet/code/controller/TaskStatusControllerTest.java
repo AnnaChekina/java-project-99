@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import hexlet.code.dto.TaskStatusCreateDTO;
 import hexlet.code.dto.TaskStatusDTO;
 import hexlet.code.dto.TaskStatusUpdateDTO;
+import hexlet.code.mapper.TaskStatusMapper;
 import hexlet.code.model.Task;
 import hexlet.code.model.TaskStatus;
 import hexlet.code.repository.TaskRepository;
@@ -22,6 +23,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
 import java.time.LocalDate;
+import java.util.Comparator;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -50,6 +52,9 @@ class TaskStatusControllerTest {
     @Autowired
     private TaskRepository taskRepository;
 
+    @Autowired
+    private TaskStatusMapper taskStatusMapper;
+
     @BeforeEach
     void setUp() {
         taskRepository.deleteAll();
@@ -62,11 +67,13 @@ class TaskStatusControllerTest {
         TaskStatus status1 = new TaskStatus();
         status1.setName("Draft");
         status1.setSlug("draft");
+        status1.setCreatedAt(LocalDate.now());
         taskStatusRepository.save(status1);
 
         TaskStatus status2 = new TaskStatus();
         status2.setName("Published");
         status2.setSlug("published");
+        status2.setCreatedAt(LocalDate.now());
         taskStatusRepository.save(status2);
 
         MvcResult result = mockMvc.perform(get("/api/task_statuses"))
@@ -85,17 +92,19 @@ class TaskStatusControllerTest {
         assertThat(statusesFromController).hasSize(2);
         assertThat(statusesFromDB).hasSize(2);
 
-        List<String> controllerNames = statusesFromController.stream()
-                .map(TaskStatusDTO::getName)
-                .sorted()
+        List<TaskStatusDTO> statusesFromDBasDTO = statusesFromDB.stream()
+                .map(taskStatusMapper::map)
+                .sorted(Comparator.comparing(TaskStatusDTO::getName))
                 .toList();
 
-        List<String> dbNames = statusesFromDB.stream()
-                .map(TaskStatus::getName)
-                .sorted()
+        List<TaskStatusDTO> sortedStatusesFromController = statusesFromController.stream()
+                .sorted(Comparator.comparing(TaskStatusDTO::getName))
                 .toList();
 
-        assertThat(controllerNames).containsExactlyElementsOf(dbNames);
+        assertThat(sortedStatusesFromController)
+                .usingRecursiveComparison()
+                .ignoringFields("id")
+                .isEqualTo(statusesFromDBasDTO);
     }
 
     @Test
